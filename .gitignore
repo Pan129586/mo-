@@ -1,0 +1,24 @@
+# Build outputs
+Debug/
+
+# clangd and tool caches
+.clangd/
+.cache/
+
+# Compiled artifacts
+*.o
+*.obj
+*.d
+*.out
+*.map
+*_linkInfo.xml
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
