@@ -139,6 +139,7 @@ float direct_pid_realize(_pid *pid, float actual_val)
     pid->err_last=pid->err;
     // 输出限幅 (防止转弯过猛)
     if(pid->actual_val > 150)pid->actual_val=150;
+    else if(pid->actual_val < -150)pid->actual_val=-150;
     
     return pid->actual_val;
 }

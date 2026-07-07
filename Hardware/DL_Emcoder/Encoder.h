@@ -1,16 +1,14 @@
 #ifndef __ENCODER_H
 #define __ENCODER_H
 
-// #include "tim.h"
 #include "ti_msp_dl_config.h"
 
-extern long g_lMotorPulseSigma;//电机25ms内累计脉冲总和
-extern long g_lMotor2PulseSigma;
-extern short g_nMotorPulse,g_nMotor2Pulse;//全局变量， 保存电机脉冲数值
+extern volatile long g_lMotorPulseSigma;
+extern volatile long g_lMotor2PulseSigma;
+extern volatile short g_nMotorPulse;
+extern volatile short g_nMotor2Pulse;
 
-
-
+void Encoder_Init(void);
 void GetMotorPulse(void);
 
 #endif
-

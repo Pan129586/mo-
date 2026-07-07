@@ -1,74 +1,46 @@
 /*
  * Copyright (c) 2021, Texas Instruments Incorporated
  * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * *  Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * *  Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * *  Neither the name of Texas Instruments Incorporated nor the names of
- *    its contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "ti_msp_dl_config.h"
+#include "Hardware/DL_control/control.h"
+#include "Hardware/DL_Emcoder/Encoder.h"
 #include "Hardware/OLED_Software_I2C/oled_software_i2c.h"
+
+/* OLED Status */
+static void App_ShowTraceStatus(void)
+{
+    OLED_Clear();
+    OLED_ShowString(0, 0, (uint8_t *)"Trace", 16);
+    OLED_ShowString(0, 2, (uint8_t *)Trace_GetStateText(), 16);
+    OLED_ShowString(0, 4, (uint8_t *)"N:", 16);
+    OLED_ShowNum(20, 4, g_traceTargetLaps, 1, 16);
+    OLED_ShowString(48, 4, (uint8_t *)"C:", 16);
+    OLED_ShowNum(68, 4, g_traceCompletedCorners, 2, 16);
+    OLED_ShowString(0, 6, (uint8_t *)"Y:", 16);
+    OLED_ShowNum(20, 6, (uint32_t)turn_90_count, 2, 16);
+}
 
 int main(void)
 {
+    /* System Init */
     SYSCFG_DL_init();
+    PID_param_init();
+    Encoder_Init();
+    reset_turn_count();
+    Trace_Init();
 
-    // DL_SYSTICK_enableInterrupt();   //启动内部滴答定时器 1ms
-
-
-    NVIC_EnableIRQ(TIMER_TICK_INST_INT_IRQN);   //定时器是向上计数
+    NVIC_EnableIRQ(UART_JY61P_INST_INT_IRQN);
+    NVIC_EnableIRQ(TIMER_TICK_INST_INT_IRQN);
     DL_TimerG_startCounter(TIMER_TICK_INST);
 
-     OLED_Init();
-    while (1) 
-    {
+    OLED_Init();
 
-        OLED_ShowString(5, 5, (uint8_t *)"pyq", 16);
-        Delay_ms(500);
-        
-
-        
+    /* Main Loop */
+    while (1) {
+        Trace_HandleButton();
+        App_ShowTraceStatus();
+        Delay_ms(200);
     }
 }
-
-
-
-// void TIMER_TICK_INST_IRQHandler(void)
-// {
-//     switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST))
-//     {
-//         case DL_TIMER_IIDX_ZERO:
-//             DL_GPIO_togglePins(GPIO_LED_LED1_PORT, GPIO_LED_LED1_PIN);
-//             Delay_ms(500);
-//             break;
-//         default:
-//             break;
-//     }
-
-// }
-
-

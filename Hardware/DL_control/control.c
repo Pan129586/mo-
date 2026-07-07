@@ -1,70 +1,160 @@
 #include "control.h"
 
+#include "Hardware/DL_KEY/bsp_key.h"
+#include <math.h>
 
+/* Trace Config */
+#define TRACE_MIN_LAPS              (1U)
+#define TRACE_MAX_LAPS              (2U)
+#define TRACE_CORNER_PER_LAP        (4U)
+#define TRACE_CORNER_BASE_SPEED     (45.0f)
+#define TRACE_SEARCH_BASE_SPEED     (35.0f)
+#define TRACE_LOST_STOP_TICKS       (25U)
+#define TRACE_CORNER_WINDOW_TICKS   (45U)
 
-float Baseleft = 0.0,Baseright = 0.0; //基础速度
-float  MotorPWM =0.0, Motor2PWM =0.0;
-float speed_target;
-float speed2_target;
-float variation_R;
-float direct_val;
-float jy_speed;
+/* Trace State */
+float Baseleft = 0.0f;
+float Baseright = 0.0f;
+float MotorPWM = 0.0f;
+float Motor2PWM = 0.0f;
+float speed_target = 0.0f;
+float speed2_target = 0.0f;
+float direct_val = 0.0f;
 
+static motor_dir_t direction = MOTOR_FWD;
+static motor_dir_t direction2 = MOTOR_FWD;
+static uint16_t dutyfactor = 0;
+static uint16_t dutyfactor2 = 0;
 
-static motor_dir_t direction  = MOTOR_FWD;     // 记录电机方向
- uint16_t    dutyfactor = 0;             // 记录电机占空比
-static motor_dir_t direction2  = MOTOR_FWD;     // 记录电机2方向
- uint16_t    dutyfactor2 = 0;             // 记录电机2占空比
-uint8_t is_motor_en = 0, is_motor2_en = 0;            // 电机使能
+uint8_t is_motor_en = 0;
+uint8_t is_motor2_en = 0;
 
+volatile trace_state_t g_traceState = TRACE_STATE_READY;
+volatile uint8_t g_traceTargetLaps = 1;
+volatile uint8_t g_traceCompletedCorners = 0;
+volatile uint32_t g_traceRunTicks20ms = 0;
 
-float g_fTargetJourney = 0;  //存放小车左右轮所走路程和 ， 单位cm，需要在下一阶段任务中设置
+static uint8_t s_cornerConfirmWindow = 0;
 
+static float vofa_data[5];
+static uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7F};
 
-float current_base_L = 0.0; 
-float current_base_R = 0.0;
-float base_speed_output=0.0;
-float base_speed2_output=0.0;
-
-//VOFA
-float vofa_data[5];
-uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7F};
-
-
-void TIMER_TICK_INST_IRQHandler(void)
+/* Trace State Machine */
+static uint8_t Trace_TargetCorners(void)
 {
-   switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST))  
-    {
-        case DL_TIMER_IIDX_ZERO:     //倒计时模式
-            
-            JY61P_Poll();          // 陀螺仪轮询
-            GetMotorPulse();       // 提取编码器脉冲
-            Light_Turn_control();  
+    return (uint8_t)(g_traceTargetLaps * TRACE_CORNER_PER_LAP);
+}
 
-            if(Start_Flag == 1)
-            {
-                direct_val = Gray_pd_control();
+static void Trace_ResetPidAndOutput(void)
+{
+    set_pid_target(&pid_speed, 0.0f);
+    set_pid_target(&pid_speed2, 0.0f);
+    PID_reset(&pid_speed);
+    PID_reset(&pid_speed2);
+    PID_reset(&pid_direct);
+    MotorOutput(0, 0);
+}
 
-                speed_target = Baseleft - direct_val;
-                speed2_target = Baseright + direct_val;
+static void Trace_UpdateCornerCount(void)
+{
+    uint8_t yaw_corners = (turn_90_count < 0) ? 0U : (uint8_t)turn_90_count;
 
-                set_pid_target(&pid_speed, speed_target);
-                set_pid_target(&pid_speed2, speed2_target);
+    if (Corner_Rise_Flag != 0U) {
+        s_cornerConfirmWindow = TRACE_CORNER_WINDOW_TICKS;
+    } else if (s_cornerConfirmWindow > 0U) {
+        s_cornerConfirmWindow--;
+    }
 
-                MotorPWM = speed_pid_control();
-                Motor2PWM = speed2_pid_control();
+    if ((yaw_corners > g_traceCompletedCorners) &&
+        ((s_cornerConfirmWindow > 0U) || (Corner_Flag != 0U))) {
+        g_traceCompletedCorners = yaw_corners;
+        s_cornerConfirmWindow = 0;
+    }
+}
 
-                MotorOutput(MotorPWM, Motor2PWM);
+static float Trace_SelectBaseSpeed(void)
+{
+    if (Lost_Line_Count > 0U) {
+        return TRACE_SEARCH_BASE_SPEED;
+    }
+
+    if ((Corner_Flag != 0U) || (fabsf(Line_Num) > 22.0f)) {
+        return TRACE_CORNER_BASE_SPEED;
+    }
+
+    return (float)BASE;
+}
+
+void Trace_Init(void)
+{
+    g_traceState = TRACE_STATE_READY;
+    g_traceTargetLaps = 1;
+    g_traceCompletedCorners = 0;
+    g_traceRunTicks20ms = 0;
+    s_cornerConfirmWindow = 0;
+    Start_Flag = 0;
+    set_basespeed(0.0f, 0.0f);
+    Trace_ResetPidAndOutput();
+}
+
+void Trace_Start(void)
+{
+    g_traceCompletedCorners = 0;
+    g_traceRunTicks20ms = 0;
+    s_cornerConfirmWindow = 0;
+    g_lMotorPulseSigma = 0;
+    g_lMotor2PulseSigma = 0;
+    JY61P_ResetYawTrack();
+    Trace_ResetPidAndOutput();
+    set_basespeed((float)BASE, (float)BASE);
+    Start_Flag = 1;
+    g_traceState = TRACE_STATE_RUNNING;
+}
+
+void Trace_Stop(trace_state_t next_state)
+{
+    Start_Flag = 0;
+    set_basespeed(0.0f, 0.0f);
+    Trace_ResetPidAndOutput();
+    g_traceState = next_state;
+}
+
+void Trace_HandleButton(void)
+{
+    uint8_t key = g_nButton;
+
+    if (key == 0U) {
+        return;
+    }
+    g_nButton = 0;
+
+    switch (key) {
+        case KEY1_PRES:
+            if (g_traceState != TRACE_STATE_RUNNING) {
+                if (g_traceTargetLaps < TRACE_MAX_LAPS) {
+                    g_traceTargetLaps++;
+                }
+                g_traceState = TRACE_STATE_READY;
             }
-            else
-            {
-                set_pid_target(&pid_speed, 0);
-                set_pid_target(&pid_speed2, 0);
-
-                MotorPWM = speed_pid_control();
-                Motor2PWM = speed2_pid_control();
-
-                MotorOutput(MotorPWM, Motor2PWM);
+            break;
+        case KEY2_PRES:
+            if (g_traceState != TRACE_STATE_RUNNING) {
+                if (g_traceTargetLaps > TRACE_MIN_LAPS) {
+                    g_traceTargetLaps--;
+                }
+                g_traceState = TRACE_STATE_READY;
+            }
+            break;
+        case KEY3_PRES:
+            if (g_traceState != TRACE_STATE_RUNNING) {
+                Trace_Start();
+            }
+            break;
+        case KEY4_PRES:
+            if (g_traceState == TRACE_STATE_RUNNING) {
+                Trace_Stop(TRACE_STATE_EMERGENCY_STOP);
+            } else {
+                Trace_Init();
             }
             break;
         default:
@@ -72,233 +162,194 @@ void TIMER_TICK_INST_IRQHandler(void)
     }
 }
 
+void Trace_Task20ms(void)
+{
+    /* 20ms Control Loop */
+    JY61P_Poll();
+    GetMotorPulse();
+    Light_Turn_control();
 
-	
+    if (g_traceState != TRACE_STATE_RUNNING) {
+        MotorOutput(0, 0);
+        return;
+    }
 
-void set_basespeed(float left_base,float right_base)
+    g_traceRunTicks20ms++;
+    Trace_UpdateCornerCount();
+
+    if (g_traceCompletedCorners >= Trace_TargetCorners()) {
+        Trace_Stop(TRACE_STATE_FINISHED);
+        return;
+    }
+
+    if (Lost_Line_Count >= TRACE_LOST_STOP_TICKS) {
+        Trace_Stop(TRACE_STATE_EMERGENCY_STOP);
+        return;
+    }
+
+    float base_speed = Trace_SelectBaseSpeed();
+    set_basespeed(base_speed, base_speed);
+
+    direct_val = Gray_pd_control();
+    speed_target = Baseleft - direct_val;
+    speed2_target = Baseright + direct_val;
+
+    set_pid_target(&pid_speed, speed_target);
+    set_pid_target(&pid_speed2, speed2_target);
+
+    MotorPWM = speed_pid_control();
+    Motor2PWM = speed2_pid_control();
+    MotorOutput((int)MotorPWM, (int)Motor2PWM);
+}
+
+const char *Trace_GetStateText(void)
+{
+    switch (g_traceState) {
+        case TRACE_STATE_IDLE:
+            return "IDLE ";
+        case TRACE_STATE_READY:
+            return "READY";
+        case TRACE_STATE_RUNNING:
+            return "RUN  ";
+        case TRACE_STATE_FINISHED:
+            return "DONE ";
+        case TRACE_STATE_EMERGENCY_STOP:
+            return "STOP ";
+        default:
+            return "UNKWN";
+    }
+}
+
+void TIMER_TICK_INST_IRQHandler(void)
+{
+    switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST)) {
+        case DL_TIMER_IIDX_ZERO:
+            Trace_Task20ms();
+            break;
+        default:
+            break;
+    }
+}
+
+void set_basespeed(float left_base, float right_base)
 {
     Baseleft = left_base;
     Baseright = right_base;
 }
 
-
-//灰度控制循迹
 float Gray_pd_control(void)
 {
-	
-	float cont_val = 0.0;
-	
-    set_pid_target(&pid_direct, 0); 
-    cont_val = direct_pid_realize(&pid_direct, Line_Num);    // 进行 PID 计算
-	
-	
-    return cont_val;
+    set_pid_target(&pid_direct, 0.0f);
+    return direct_pid_realize(&pid_direct, Line_Num);
 }
 
-
-float speed_pid_control(void)  
+float speed_pid_control(void)
 {
-   
-    float cont_val = 0.0;                       // 当前控制值
-    int32_t actual_speed;
-	
-       actual_speed = g_nMotorPulse;	
-    cont_val = speed_pid_realize(&pid_speed, actual_speed);    // 进行 PID 计算
-    
-//	 #if defined(PID_ASSISTANT_EN)
-//   set_computer_value(SEND_FACT_CMD, CURVES_CH1, &actual_speed, 1);                // 给通道 1 发送实际值
-// 
-// #endif
-	
-	return cont_val;
+    return speed_pid_realize(&pid_speed, (float)g_nMotorPulse);
 }
 
-float speed2_pid_control(void)  
+float speed2_pid_control(void)
 {
-   
-    float cont_val = 0.0;                       // 当前控制值
-    int32_t actual_speed;
-	
-	
-      actual_speed = g_nMotor2Pulse;
-	  cont_val = speed_pid_realize(&pid_speed2, actual_speed);    // 进行 PID 计算
-		
-    
-// #if defined(PID_ASSISTANT_EN)
-//   set_computer_value(SEND_FACT_CMD, CURVES_CH2, &actual_speed, 1);                // 给通道 1 发送实际值
-////  #else
-////    printf("实际值：%d. 目标值：%.0f\n", actual_speed, get_pid_target());      // 打印实际值和目标值
-// #endif
-	
-	return cont_val;
+    return speed_pid_realize(&pid_speed2, (float)g_nMotor2Pulse);
 }
 
-
-//使用uart1
-void UART_SendArray(uint8_t *data, uint16_t len) 
+void UART_SendArray(uint8_t *data, uint16_t len)
 {
-    for(uint16_t i = 0; i < len; i++) {
+    for (uint16_t i = 0; i < len; i++) {
         DL_UART_Main_transmitDataBlocking(UART_VOFA_INST, data[i]);
     }
 }
 
-void Send_To_VOFA(float target_left, float real_left, float target_right, float real_right, float Line_Num)
+void Send_To_VOFA(float target_left, float real_left, float target_right,
+                  float real_right, float line_num)
 {
     vofa_data[0] = target_left;
     vofa_data[1] = real_left;
     vofa_data[2] = target_right;
     vofa_data[3] = real_right;
-    vofa_data[4] = Line_Num;
-    
+    vofa_data[4] = line_num;
+
     UART_SendArray((uint8_t *)vofa_data, sizeof(vofa_data));
     UART_SendArray(vofa_tail, 4);
 }
 
-
-/*****************电机的控制函数***************/
-
-void MotorOutput(int nMotorPwm,int nMotor2Pwm)//设置电机电压和方向
+void MotorOutput(int nMotorPwm, int nMotor2Pwm)
 {
-		if (nMotorPwm >= 0)    // 判断电机方向         
-		{
-			set_motor_direction(MOTOR_FWD);   //正方向要对应
-		}
-		else
-		{
-			nMotorPwm = -nMotorPwm;    
-			set_motor_direction(MOTOR_REV);   //正方向要对应
-		}
-		nMotorPwm = ((nMotorPwm > PWM_MAX_PERIOD_COUNT) ? PWM_MAX_PERIOD_COUNT : nMotorPwm);    // 速度上限处理
-		
-		
-		if (nMotor2Pwm >= 0)    // 判断电机方向         
-		{
-			set_motor2_direction(MOTOR_FWD);   //正方向要对应
-		}
-		else
-		{
-			nMotor2Pwm = -nMotor2Pwm;    
-			set_motor2_direction(MOTOR_REV);   //正方向要对应
-		}
-		
-		nMotor2Pwm = ((nMotor2Pwm > PWM_MAX_PERIOD_COUNT) ? PWM_MAX_PERIOD_COUNT : nMotor2Pwm);    // 速度上限处理
-		
-		set_motor_speed(nMotorPwm);        // 设置 PWM 占空比
-		set_motor2_speed(nMotor2Pwm);      // 设置 PWM 占空比
- }
+    /* Motor Output */
+    if (nMotorPwm >= 0) {
+        set_motor_direction(MOTOR_FWD);
+    } else {
+        nMotorPwm = -nMotorPwm;
+        set_motor_direction(MOTOR_REV);
+    }
+    if (nMotorPwm > PWM_MAX_PERIOD_COUNT) {
+        nMotorPwm = PWM_MAX_PERIOD_COUNT;
+    }
 
- 
-/**
-  * @brief  设置电机速度
-  * @param  v: 速度（占空比）
-  * @retval 无
-  */
-void set_motor_speed(uint16_t v)    //这种还是单极性控制。。。。。如果想要更大的力，就要改成双极性的来。
-{
-  dutyfactor = v;
-  SET_COMPAER(v);
+    if (nMotor2Pwm >= 0) {
+        set_motor2_direction(MOTOR_FWD);
+    } else {
+        nMotor2Pwm = -nMotor2Pwm;
+        set_motor2_direction(MOTOR_REV);
+    }
+    if (nMotor2Pwm > PWM2_MAX_PERIOD_COUNT) {
+        nMotor2Pwm = PWM2_MAX_PERIOD_COUNT;
+    }
+
+    set_motor_speed((uint16_t)nMotorPwm);
+    set_motor2_speed((uint16_t)nMotor2Pwm);
 }
 
-/**
-  * @brief  设置电机方向
-  * @param  无
-  * @retval 无
-  */
-void set_motor_direction(motor_dir_t dir)    //这个要改为平衡车的前进和后退
+void set_motor_speed(uint16_t v)
 {
-  direction = dir;
-  
-  if (direction == MOTOR_FWD)
-  {
-	SET_FWD;
-  }
-  else
-  {
-	SET_REV;
-  }
+    dutyfactor = v;
+    SET_COMPAER(v);
 }
 
-/**
-  * @brief  使能电机
-  * @param  无
-  * @retval 无
-  */
-void set_motor_enable(void)   //这俩个使能和禁用的函数对于双极性控制来说还有效吗？
+void set_motor_direction(motor_dir_t dir)
 {
-	is_motor_en  = 1;
+    direction = dir;
+    if (direction == MOTOR_FWD) {
+        SET_FWD;
+    } else {
+        SET_REV;
+    }
 }
 
-/**
-  * @brief  禁用电机
-  * @param  无
-  * @retval 无
-  */
+void set_motor_enable(void)
+{
+    is_motor_en = 1;
+}
+
 void set_motor_disable(void)
 {
     SET_STOP;
-	
-	is_motor_en  = 0; 
+    is_motor_en = 0;
 }
 
-
-/*****************电机2的控制函数***************/
-/**
-  * @brief  设置电机2速度
-  * @param  v: 速度（占空比）
-  * @retval 无
-  */
 void set_motor2_speed(uint16_t v)
 {
-  dutyfactor2 = v;   
-  SET2_COMPAER(v);
+    dutyfactor2 = v;
+    SET2_COMPAER(v);
 }
 
-/**
-  * @brief  设置电机2方向
-  * @param  无
-  * @retval 无
-  */
-void set_motor2_direction(motor_dir_t dir)  
+void set_motor2_direction(motor_dir_t dir)
 {
-  direction2 =  dir;    
-  
-  if (direction2 == MOTOR_FWD) 
-  {
-    SET2_FWD;
-  }
-  else
-  {
-   SET2_REV;
-  }
+    direction2 = dir;
+    if (direction2 == MOTOR_FWD) {
+        SET2_FWD;
+    } else {
+        SET2_REV;
+    }
 }
 
-/**
-  * @brief  使能电机2
-  * @param  无
-  * @retval 无
-  */
 void set_motor2_enable(void)
 {
-	is_motor2_en  = 1;
-	
-
+    is_motor2_en = 1;
 }
 
-/**
-  * @brief  禁用电机2
-  * @param  无
-  * @retval 无
-  */
 void set_motor2_disable(void)
 {
     SET2_STOP;
-	
-	is_motor2_en  = 0;
-
-
+    is_motor2_en = 0;
 }
-
-
-
-
-
