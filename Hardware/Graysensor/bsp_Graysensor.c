@@ -1,6 +1,6 @@
 #include "bsp_Graysensor.h"
 
-/* Sensor State */
+
 uint8_t State_Value[8];
 uint16_t sensor_values[8];
 uint16_t ADC_Value_Gray;
@@ -22,7 +22,7 @@ static const float sensor_weight[8] = {
 
 void select_channel(uint8_t channel)
 {
-    /* ADC Channel Select */
+   
     if ((channel & 0x01U) != 0U) {
         DL_GPIO_setPins(GPIO_SENSOR_AD0_PORT, GPIO_SENSOR_AD0_PIN);
     } else {
@@ -44,11 +44,12 @@ void select_channel(uint8_t channel)
 
 void Graysensor_Read_All(void)
 {
-    for (uint8_t i = 0; i < 8U; i++) {
+    for (uint8_t i = 0; i < 8U; i++) 
+    {
         select_channel(i);
         Delay_us(10);
 
-        DL_ADC12_startConversion(ADC12_sensor_INST);
+        DL_ADC12_startConversion(ADC12_sensor_INST);        //等待adc的转化
         while (DL_ADC12_getPendingInterrupt(ADC12_sensor_INST) !=
                DL_ADC12_IIDX_MEM0_RESULT_LOADED) {
         }
@@ -59,19 +60,22 @@ void Graysensor_Read_All(void)
 
 void Light_Turn_control(void)
 {
-    /* Line Detection */
     float sum_weight = 0.0f;
     uint8_t sum_black = 0;
     uint8_t raw_corner;
 
     Graysensor_Read_All();
 
-    for (uint8_t i = 0; i < 8U; i++) {
-        if (sensor_values[i] > THRESHOLD) {
+    for (uint8_t i = 0; i < 8U; i++) 
+    {
+        if (sensor_values[i] > THRESHOLD) 
+        {
             State_Value[i] = 1;
             sum_weight += sensor_weight[i];
             sum_black++;
-        } else {
+        } 
+        else 
+        {
             State_Value[i] = 0;
         }
     }
@@ -79,35 +83,44 @@ void Light_Turn_control(void)
     Black_Sensor_Count = sum_black;
     Corner_Rise_Flag = 0;
 
-    if (sum_black == 0U) {
+    if (sum_black == 0U) 
+    {
         Line_Num = Last_Num;
         Corner_Flag = 0;
-        if (Lost_Line_Count < 255U) {
+        if (Lost_Line_Count < 255U) 
+        {
             Lost_Line_Count++;
         }
-    } else {
+    } 
+    else 
+    {
         Lost_Line_Count = 0;
         raw_corner = (sum_black >= 3U) ? 1U : 0U;
         Corner_Flag = raw_corner;
 
-        if (raw_corner != 0U) {
+        if (raw_corner != 0U) 
+        {
             Line_Num = Last_Num;
-        } else {
+        } else 
+        {
             Line_Num = sum_weight / (float)sum_black;
             Last_Num = Line_Num;
         }
 
-        if ((raw_corner != 0U) && (s_lastCornerFlag == 0U) && (s_cornerLockTicks == 0U)) {
+        if ((raw_corner != 0U) && (s_lastCornerFlag == 0U) && (s_cornerLockTicks == 0U)) 
+        {
             Corner_Rise_Flag = 1;
             s_cornerLockTicks = 10;
         }
         s_lastCornerFlag = raw_corner;
     }
 
-    if (Corner_Flag == 0U) {
+    if (Corner_Flag == 0U) 
+    {
         s_lastCornerFlag = 0;
     }
-    if (s_cornerLockTicks > 0U) {
+    if (s_cornerLockTicks > 0U) 
+    {
         s_cornerLockTicks--;
     }
 }

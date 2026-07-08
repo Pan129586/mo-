@@ -3,16 +3,16 @@
 #include "Hardware/DL_KEY/bsp_key.h"
 #include <math.h>
 
-/* Trace Config */
-#define TRACE_MIN_LAPS              (1U)
-#define TRACE_MAX_LAPS              (2U)
-#define TRACE_CORNER_PER_LAP        (4U)
-#define TRACE_CORNER_BASE_SPEED     (45.0f)
-#define TRACE_SEARCH_BASE_SPEED     (35.0f)
-#define TRACE_LOST_STOP_TICKS       (25U)
-#define TRACE_CORNER_WINDOW_TICKS   (45U)
 
-/* Trace State */
+#define TRACE_MIN_LAPS              (1U)    // 最小行驶圈数
+#define TRACE_MAX_LAPS              (2U)
+#define TRACE_CORNER_PER_LAP        (4U)    // 跑完一圈需要的直角数
+#define TRACE_CORNER_BASE_SPEED     (45.0f)     // 遇到直角时的降速目标
+#define TRACE_SEARCH_BASE_SPEED     (35.0f)      // 脱线时的寻线速度
+#define TRACE_LOST_STOP_TICKS       (25U)       // 连续脱线多少个时间周期之后认为是迷失并且刹车
+#define TRACE_CORNER_WINDOW_TICKS   (45U)       // 直角确认的防抖时间
+
+ 
 float Baseleft = 0.0f;
 float Baseright = 0.0f;
 float MotorPWM = 0.0f;
@@ -39,11 +39,14 @@ static uint8_t s_cornerConfirmWindow = 0;
 static float vofa_data[5];
 static uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7F};
 
-/* Trace State Machine */
+
+//计算当前设定的圈数一共需要跑多少个直角
 static uint8_t Trace_TargetCorners(void)
 {
     return (uint8_t)(g_traceTargetLaps * TRACE_CORNER_PER_LAP);
 }
+
+
 
 static void Trace_ResetPidAndOutput(void)
 {
@@ -55,35 +58,50 @@ static void Trace_ResetPidAndOutput(void)
     MotorOutput(0, 0);
 }
 
+
+//直角计圈防抖
 static void Trace_UpdateCornerCount(void)
 {
+    // 获取底层识别到的直角总数
     uint8_t yaw_corners = (turn_90_count < 0) ? 0U : (uint8_t)turn_90_count;
-
-    if (Corner_Rise_Flag != 0U) {
+    // 如果检测到直角信号上升沿（刚压到直角线）
+    if (Corner_Rise_Flag != 0U) 
+    {
+        // 开启防抖窗口，在此窗口时间内，允许更新计数值
         s_cornerConfirmWindow = TRACE_CORNER_WINDOW_TICKS;
-    } else if (s_cornerConfirmWindow > 0U) {
+    } else if (s_cornerConfirmWindow > 0U) 
+    {
         s_cornerConfirmWindow--;
     }
 
+    // 只有当底层直角数增加了，并且 (还在防抖窗口内 或者 传感器当前正压着直角线)
     if ((yaw_corners > g_traceCompletedCorners) &&
-        ((s_cornerConfirmWindow > 0U) || (Corner_Flag != 0U))) {
+        ((s_cornerConfirmWindow > 0U) || (Corner_Flag != 0U))) 
+        {
+           //确认有效，更新已完成的直角总数
         g_traceCompletedCorners = yaw_corners;
-        s_cornerConfirmWindow = 0;
+        s_cornerConfirmWindow = 0;  //防止同一直角重复计数
     }
 }
 
 static float Trace_SelectBaseSpeed(void)
 {
-    if (Lost_Line_Count > 0U) {
+    //如果处于脱线状态，切入极低速寻线模式
+    if (Lost_Line_Count > 0U) 
+    {
         return TRACE_SEARCH_BASE_SPEED;
     }
 
-    if ((Corner_Flag != 0U) || (fabsf(Line_Num) > 22.0f)) {
+    //如果遇到直角特征，或者当前车身偏离黑线很远
+    if ((Corner_Flag != 0U) || (fabsf(Line_Num) > 22.0f)) 
+    {
         return TRACE_CORNER_BASE_SPEED;
     }
 
+    // 正常直线行驶
     return (float)BASE;
 }
+
 
 void Trace_Init(void)
 {
@@ -123,37 +141,47 @@ void Trace_HandleButton(void)
 {
     uint8_t key = g_nButton;
 
-    if (key == 0U) {
+    if (key == 0U) 
+    {
         return;
     }
     g_nButton = 0;
 
-    switch (key) {
+    switch (key) 
+    {
         case KEY1_PRES:
-            if (g_traceState != TRACE_STATE_RUNNING) {
-                if (g_traceTargetLaps < TRACE_MAX_LAPS) {
+            if (g_traceState != TRACE_STATE_RUNNING)
+             {
+                if (g_traceTargetLaps < TRACE_MAX_LAPS) 
+                {
                     g_traceTargetLaps++;
                 }
                 g_traceState = TRACE_STATE_READY;
             }
             break;
         case KEY2_PRES:
-            if (g_traceState != TRACE_STATE_RUNNING) {
-                if (g_traceTargetLaps > TRACE_MIN_LAPS) {
+            if (g_traceState != TRACE_STATE_RUNNING) 
+            {
+                if (g_traceTargetLaps > TRACE_MIN_LAPS) 
+                {
                     g_traceTargetLaps--;
                 }
                 g_traceState = TRACE_STATE_READY;
             }
             break;
         case KEY3_PRES:
-            if (g_traceState != TRACE_STATE_RUNNING) {
+            if (g_traceState != TRACE_STATE_RUNNING) 
+            {
                 Trace_Start();
             }
             break;
         case KEY4_PRES:
-            if (g_traceState == TRACE_STATE_RUNNING) {
+            if (g_traceState == TRACE_STATE_RUNNING) 
+            {
                 Trace_Stop(TRACE_STATE_EMERGENCY_STOP);
-            } else {
+            } 
+            else 
+            {
                 Trace_Init();
             }
             break;
@@ -162,14 +190,16 @@ void Trace_HandleButton(void)
     }
 }
 
+
 void Trace_Task20ms(void)
 {
-    /* 20ms Control Loop */
+   
     JY61P_Poll();
     GetMotorPulse();
     Light_Turn_control();
 
-    if (g_traceState != TRACE_STATE_RUNNING) {
+    if (g_traceState != TRACE_STATE_RUNNING) 
+    {
         MotorOutput(0, 0);
         return;
     }
@@ -177,12 +207,17 @@ void Trace_Task20ms(void)
     g_traceRunTicks20ms++;
     Trace_UpdateCornerCount();
 
-    if (g_traceCompletedCorners >= Trace_TargetCorners()) {
-        Trace_Stop(TRACE_STATE_FINISHED);
+    //完成的直角数目大于目标的直角数目
+    if (g_traceCompletedCorners >= Trace_TargetCorners())
+    {
+        Trace_Stop(TRACE_STATE_FINISHED);   //停车
+
+        //该位置后面加入瞄准部分的开启激光
         return;
     }
 
-    if (Lost_Line_Count >= TRACE_LOST_STOP_TICKS) {
+    if (Lost_Line_Count >= TRACE_LOST_STOP_TICKS) 
+    {
         Trace_Stop(TRACE_STATE_EMERGENCY_STOP);
         return;
     }
@@ -222,7 +257,8 @@ const char *Trace_GetStateText(void)
 
 void TIMER_TICK_INST_IRQHandler(void)
 {
-    switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST)) {
+    switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST)) 
+    {
         case DL_TIMER_IIDX_ZERO:
             Trace_Task20ms();
             break;

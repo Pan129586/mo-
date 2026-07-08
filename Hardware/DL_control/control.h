@@ -8,6 +8,7 @@
 #include "Hardware/DL_pid/bsp_pid.h"
 #include <stdint.h>
 
+
 #define SET_FWD  do { \
     DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
@@ -48,11 +49,11 @@
 #define PWM_MAX_PERIOD_COUNT  (PWM_PERIOD_COUNT - 30)
 #define PWM2_MAX_PERIOD_COUNT (PWM2_PERIOD_COUNT - 30)
 
-#define ENCODER_RESOLUTION         (13)
-#define ENCODER_TOTAL_RESOLUTION   (ENCODER_RESOLUTION * 4)
-#define REDUCTION_RATIO            (28)
+#define ENCODER_RESOLUTION         (13)       
+#define ENCODER_TOTAL_RESOLUTION   (ENCODER_RESOLUTION * 4) //四倍频
+#define REDUCTION_RATIO            (28)   //减速比
 #define SPEED_PID_PERIOD           (20)
-#define WheelR                     (3.25f)
+#define WheelR                     (3.25f)  //轮子半径
 #define lunju                      (14)
 #define BASE                       (60)
 

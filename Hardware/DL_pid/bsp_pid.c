@@ -17,13 +17,9 @@ void PID_param_init()
     pid_direct.integral=0.0;
 
 		pid_direct.Kp = 0.65;
-//		pid_direct.Kp = 0.55;
 		pid_direct.Ki = 0.0;
 		pid_direct.Kd = 0.24;
 	
-//	    pid_direct.Kp = 1.6;
-//		pid_direct.Ki = 0.0;
-//		pid_direct.Kd = 0.1;
   
     pid_speed.target_val=0.0;				
     pid_speed.actual_val=0.0;

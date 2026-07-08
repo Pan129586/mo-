@@ -1,0 +1,45 @@
+﻿Commit Notes
+============
+
+说明
+----
+这个文件用于记录每一次 Git 提交，方便之后在 Windows 记事本里直接查看修改历史。
+后续每次提交代码时，先补充本文件，再和代码一起提交。
+
+记录格式
+--------
+提交时间:
+Commit:
+标题:
+主要修改:
+构建/验证:
+推送状态:
+
+历史提交
+--------
+
+提交时间: 2026-07-07 12:14:40 +0800
+Commit: d2f7d5757ed4b5854cad58a9bf5762f7abcc6a3c
+标题: Initial commit
+主要修改:
+- 初始化 V1.1 工程 Git 仓库。
+- 提交源码、工程配置、SysConfig 配置、IDE 配置和 README 文档。
+- 通过 .gitignore 排除 Debug、缓存和常见编译产物。
+构建/验证:
+- 已确认 Debug/ 未进入 Git 跟踪文件。
+- 已确认远端指向 https://github.com/Pan129586/mo-.git。
+推送状态: 已推送到 GitHub main 分支。
+
+提交时间: 2026-07-07 17:29:57 +0800
+Commit: a864349e5de1e1bbc6ed74e17dfff5bf70198506
+标题: Implement trace lap control
+主要修改:
+- 实现 MSPM0 外部中断模拟编码器计数，保留 GetMotorPulse() 20ms 周期读取接口。
+- 增加正方形赛道循迹状态机，支持按键设置 1/2 圈、启动、急停和 OLED 状态显示。
+- 增强 JY61P 航向累计、灰度传感器拐角/脱线检测和速度/方向控制逻辑。
+- 在主要代码文件中补充分区标题注释，方便之后阅读和调参。
+构建/验证:
+- 在 Debug 目录运行 D:\download\page\ccs\utils\bin\gmake.exe -j4 all，构建通过。
+- 已确认 Debug/ 未进入 Git 跟踪文件。
+- 已确认本地 HEAD 与 origin/main 都指向该提交。
+推送状态: 已推送到 GitHub main 分支。

@@ -47,7 +47,7 @@ static void JY61P_ParseYaw(void)
 
 void JY61P_ResetYawTrack(void)
 {
-    /* Yaw Tracking */
+
     total_yaw = 0.0f;
     turn_90_count = 0;
     target_yaw = 0.0f;
