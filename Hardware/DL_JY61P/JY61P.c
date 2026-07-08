@@ -4,7 +4,6 @@
 
 #define JY_TURN_COMPLETE_BIAS_DEG (10.0f)
 
-/* Yaw State */
 volatile float yaw_real = 0.0f;
 volatile float total_yaw = 0.0f;
 volatile float last_yaw = 0.0f;
@@ -45,18 +44,13 @@ static void JY61P_ParseYaw(void)
     yaw_real = (float)yaw_raw / 32768.0f * 180.0f;
 }
 
-void JY61P_ResetYawTrack(void)
-{
 
+void reset_turn_count(void)
+{
     total_yaw = 0.0f;
     turn_90_count = 0;
     target_yaw = 0.0f;
     last_yaw = yaw_real;
-}
-
-void reset_turn_count(void)
-{
-    JY61P_ResetYawTrack();
 }
 
 void JY61P_UpdateTurnCounter(void)
@@ -79,7 +73,6 @@ void JY61P_UpdateTurnCounter(void)
 
 static void JY61P_DecodeByte(uint8_t ch)
 {
-    /* Frame Decode */
     static uint8_t cnt = 0;
 
     switch (jy_state) {

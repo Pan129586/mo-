@@ -23,21 +23,30 @@ static const float sensor_weight[8] = {
 void select_channel(uint8_t channel)
 {
    
-    if ((channel & 0x01U) != 0U) {
+    if ((channel & 0x01U) != 0U) 
+    {
         DL_GPIO_setPins(GPIO_SENSOR_AD0_PORT, GPIO_SENSOR_AD0_PIN);
-    } else {
+    } 
+    else 
+    {
         DL_GPIO_clearPins(GPIO_SENSOR_AD0_PORT, GPIO_SENSOR_AD0_PIN);
     }
 
-    if ((channel & 0x02U) != 0U) {
+    if ((channel & 0x02U) != 0U) 
+    {
         DL_GPIO_setPins(GPIO_SENSOR_AD1_PORT, GPIO_SENSOR_AD1_PIN);
-    } else {
+    } 
+    else 
+    {
         DL_GPIO_clearPins(GPIO_SENSOR_AD1_PORT, GPIO_SENSOR_AD1_PIN);
     }
 
-    if ((channel & 0x04U) != 0U) {
+    if ((channel & 0x04U) != 0U) 
+    {
         DL_GPIO_setPins(GPIO_SENSOR_AD2_PORT, GPIO_SENSOR_AD2_PIN);
-    } else {
+    } 
+    else 
+    {
         DL_GPIO_clearPins(GPIO_SENSOR_AD2_PORT, GPIO_SENSOR_AD2_PIN);
     }
 }
@@ -95,22 +104,31 @@ void Light_Turn_control(void)
     else 
     {
         Lost_Line_Count = 0;
-        raw_corner = (sum_black >= 3U) ? 1U : 0U;
+        if(sum_black>= 3U)
+        {
+            raw_corner = 1U;
+        }
+        else
+        {
+            raw_corner=0U;
+        }
+
         Corner_Flag = raw_corner;
 
         if (raw_corner != 0U) 
         {
             Line_Num = Last_Num;
-        } else 
+        } 
+        else 
         {
             Line_Num = sum_weight / (float)sum_black;
             Last_Num = Line_Num;
         }
-
+        //消抖，只有在刚刚进入直角的时候判断才成立
         if ((raw_corner != 0U) && (s_lastCornerFlag == 0U) && (s_cornerLockTicks == 0U)) 
         {
             Corner_Rise_Flag = 1;
-            s_cornerLockTicks = 10;
+            s_cornerLockTicks = 10;     //在该时间之内只会记录一次上升沿变化
         }
         s_lastCornerFlag = raw_corner;
     }

@@ -4,13 +4,13 @@
 #include <math.h>
 
 
-#define TRACE_MIN_LAPS              (1U)    // 最小行驶圈数
-#define TRACE_MAX_LAPS              (2U)
-#define TRACE_CORNER_PER_LAP        (4U)    // 跑完一圈需要的直角数
-#define TRACE_CORNER_BASE_SPEED     (45.0f)     // 遇到直角时的降速目标
-#define TRACE_SEARCH_BASE_SPEED     (35.0f)      // 脱线时的寻线速度
-#define TRACE_LOST_STOP_TICKS       (25U)       // 连续脱线多少个时间周期之后认为是迷失并且刹车
-#define TRACE_CORNER_WINDOW_TICKS   (45U)       // 直角确认的防抖时间
+#define min_circle              (1U)    // 最小行驶圈数
+#define maix_circle              (2U)
+#define four_corner_count        (4U)    // 跑完一圈需要的直角数
+#define corner_base_speed     (45.0f)     // 遇到直角时的降速目标
+#define lost_base_speed     (35.0f)      // 脱线时的寻线速度
+#define lost_stop_times       (25U)       // 连续脱线多少个时间周期之后认为是迷失并且刹车
+#define corner_wait_time   (45U)       // 直角确认的防抖时间
 
  
 float Baseleft = 0.0f;
@@ -29,26 +29,26 @@ static uint16_t dutyfactor2 = 0;
 uint8_t is_motor_en = 0;
 uint8_t is_motor2_en = 0;
 
-volatile trace_state_t g_traceState = TRACE_STATE_READY;
-volatile uint8_t g_traceTargetLaps = 1;
-volatile uint8_t g_traceCompletedCorners = 0;
-volatile uint32_t g_traceRunTicks20ms = 0;
+volatile trace_state_t g_traceState = RUN_STATE_READY;
+volatile uint8_t g_target_circle = 1;
+volatile uint8_t g_compt_corner = 0;
+volatile uint32_t g_run_20ms = 0;
 
-static uint8_t s_cornerConfirmWindow = 0;
+static uint8_t ture_wait_time = 0;
 
 static float vofa_data[5];
 static uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7F};
 
 
 //计算当前设定的圈数一共需要跑多少个直角
-static uint8_t Trace_TargetCorners(void)
+static uint8_t totall_corners(void)
 {
-    return (uint8_t)(g_traceTargetLaps * TRACE_CORNER_PER_LAP);
+    return (uint8_t)(g_target_circle * four_corner_count);
 }
 
 
 
-static void Trace_ResetPidAndOutput(void)
+static void rest_pid(void)
 {
     set_pid_target(&pid_speed, 0.0f);
     set_pid_target(&pid_speed2, 0.0f);
@@ -60,42 +60,53 @@ static void Trace_ResetPidAndOutput(void)
 
 
 //直角计圈防抖
-static void Trace_UpdateCornerCount(void)
+static void updata_corner_count(void)
 {
     // 获取底层识别到的直角总数
-    uint8_t yaw_corners = (turn_90_count < 0) ? 0U : (uint8_t)turn_90_count;
+
+    uint8_t yaw_corners = 0U;
+    if(turn_90_count<0)
+    {
+        yaw_corners = 0U;
+    }
+    else 
+    {
+        yaw_corners=turn_90_count;
+    }
+
     // 如果检测到直角信号上升沿（刚压到直角线）
     if (Corner_Rise_Flag != 0U) 
     {
         // 开启防抖窗口，在此窗口时间内，允许更新计数值
-        s_cornerConfirmWindow = TRACE_CORNER_WINDOW_TICKS;
-    } else if (s_cornerConfirmWindow > 0U) 
+        ture_wait_time = corner_wait_time;
+    } 
+    else if (ture_wait_time > 0U) 
     {
-        s_cornerConfirmWindow--;
+        ture_wait_time--;
     }
 
     // 只有当底层直角数增加了，并且 (还在防抖窗口内 或者 传感器当前正压着直角线)
-    if ((yaw_corners > g_traceCompletedCorners) &&
-        ((s_cornerConfirmWindow > 0U) || (Corner_Flag != 0U))) 
+    if ((yaw_corners > g_compt_corner) &&
+        ((ture_wait_time > 0U) || (Corner_Flag != 0U))) 
         {
            //确认有效，更新已完成的直角总数
-        g_traceCompletedCorners = yaw_corners;
-        s_cornerConfirmWindow = 0;  //防止同一直角重复计数
+        g_compt_corner = yaw_corners;
+        ture_wait_time = 0;  //防止同一直角重复计数
     }
 }
 
-static float Trace_SelectBaseSpeed(void)
+static float select_speed(void)
 {
     //如果处于脱线状态，切入极低速寻线模式
     if (Lost_Line_Count > 0U) 
     {
-        return TRACE_SEARCH_BASE_SPEED;
+        return lost_base_speed;
     }
 
     //如果遇到直角特征，或者当前车身偏离黑线很远
     if ((Corner_Flag != 0U) || (fabsf(Line_Num) > 22.0f)) 
     {
-        return TRACE_CORNER_BASE_SPEED;
+        return corner_base_speed;
     }
 
     // 正常直线行驶
@@ -103,41 +114,42 @@ static float Trace_SelectBaseSpeed(void)
 }
 
 
-void Trace_Init(void)
+void run_data_init(void)
 {
-    g_traceState = TRACE_STATE_READY;
-    g_traceTargetLaps = 1;
-    g_traceCompletedCorners = 0;
-    g_traceRunTicks20ms = 0;
-    s_cornerConfirmWindow = 0;
+    g_traceState = RUN_STATE_READY;
+    g_target_circle = 1;
+    g_compt_corner = 0;
+    g_run_20ms = 0;
+    ture_wait_time = 0;
     Start_Flag = 0;
     set_basespeed(0.0f, 0.0f);
-    Trace_ResetPidAndOutput();
+    rest_pid();
 }
 
-void Trace_Start(void)
+
+void run_start(void)
 {
-    g_traceCompletedCorners = 0;
-    g_traceRunTicks20ms = 0;
-    s_cornerConfirmWindow = 0;
+    g_compt_corner = 0;
+    g_run_20ms = 0;
+    ture_wait_time = 0;
     g_lMotorPulseSigma = 0;
     g_lMotor2PulseSigma = 0;
-    JY61P_ResetYawTrack();
-    Trace_ResetPidAndOutput();
+    reset_turn_count();
+    rest_pid();
     set_basespeed((float)BASE, (float)BASE);
     Start_Flag = 1;
-    g_traceState = TRACE_STATE_RUNNING;
+    g_traceState = RUN_STATE_RUNNING;
 }
 
-void Trace_Stop(trace_state_t next_state)
+void run_stop(trace_state_t next_state)
 {
     Start_Flag = 0;
     set_basespeed(0.0f, 0.0f);
-    Trace_ResetPidAndOutput();
+    rest_pid();
     g_traceState = next_state;
 }
 
-void Trace_HandleButton(void)
+void key_change_circle(void)
 {
     uint8_t key = g_nButton;
 
@@ -150,39 +162,39 @@ void Trace_HandleButton(void)
     switch (key) 
     {
         case KEY1_PRES:
-            if (g_traceState != TRACE_STATE_RUNNING)
+            if (g_traceState != RUN_STATE_RUNNING)
              {
-                if (g_traceTargetLaps < TRACE_MAX_LAPS) 
+                if (g_target_circle < maix_circle) 
                 {
-                    g_traceTargetLaps++;
+                    g_target_circle++;
                 }
-                g_traceState = TRACE_STATE_READY;
+                g_traceState = RUN_STATE_READY;
             }
             break;
         case KEY2_PRES:
-            if (g_traceState != TRACE_STATE_RUNNING) 
+            if (g_traceState != RUN_STATE_RUNNING) 
             {
-                if (g_traceTargetLaps > TRACE_MIN_LAPS) 
+                if (g_target_circle > min_circle) 
                 {
-                    g_traceTargetLaps--;
+                    g_target_circle--;
                 }
-                g_traceState = TRACE_STATE_READY;
+                g_traceState = RUN_STATE_READY;
             }
             break;
         case KEY3_PRES:
-            if (g_traceState != TRACE_STATE_RUNNING) 
+            if (g_traceState != RUN_STATE_RUNNING) 
             {
-                Trace_Start();
+                run_start();
             }
             break;
         case KEY4_PRES:
-            if (g_traceState == TRACE_STATE_RUNNING) 
+            if (g_traceState == RUN_STATE_RUNNING) 
             {
-                Trace_Stop(TRACE_STATE_EMERGENCY_STOP);
+                run_stop(RUN_STATE_EMERGENCY_STOP);
             } 
             else 
             {
-                Trace_Init();
+                run_data_init();
             }
             break;
         default:
@@ -198,31 +210,31 @@ void Trace_Task20ms(void)
     GetMotorPulse();
     Light_Turn_control();
 
-    if (g_traceState != TRACE_STATE_RUNNING) 
+    if (g_traceState != RUN_STATE_RUNNING) 
     {
         MotorOutput(0, 0);
         return;
     }
 
-    g_traceRunTicks20ms++;
-    Trace_UpdateCornerCount();
+    g_run_20ms++;  //用来计时小车跑圈的时间
+    updata_corner_count();
 
     //完成的直角数目大于目标的直角数目
-    if (g_traceCompletedCorners >= Trace_TargetCorners())
+    if (g_compt_corner >= totall_corners())
     {
-        Trace_Stop(TRACE_STATE_FINISHED);   //停车
+        run_stop(RUN_STATE_FINISHED);   //停车
 
         //该位置后面加入瞄准部分的开启激光
         return;
     }
 
-    if (Lost_Line_Count >= TRACE_LOST_STOP_TICKS) 
+    if (Lost_Line_Count >= lost_stop_times) 
     {
-        Trace_Stop(TRACE_STATE_EMERGENCY_STOP);
+        run_stop(RUN_STATE_EMERGENCY_STOP);
         return;
     }
 
-    float base_speed = Trace_SelectBaseSpeed();
+    float base_speed = select_speed();
     set_basespeed(base_speed, base_speed);
 
     direct_val = Gray_pd_control();
@@ -237,18 +249,19 @@ void Trace_Task20ms(void)
     MotorOutput((int)MotorPWM, (int)Motor2PWM);
 }
 
-const char *Trace_GetStateText(void)
+const char *get_runstate(void)
 {
-    switch (g_traceState) {
-        case TRACE_STATE_IDLE:
+    switch (g_traceState) 
+    {
+        case RUN_STATE_IDLE:
             return "IDLE ";
-        case TRACE_STATE_READY:
+        case RUN_STATE_READY:
             return "READY";
-        case TRACE_STATE_RUNNING:
+        case RUN_STATE_RUNNING:
             return "RUN  ";
-        case TRACE_STATE_FINISHED:
+        case RUN_STATE_FINISHED:
             return "DONE ";
-        case TRACE_STATE_EMERGENCY_STOP:
+        case RUN_STATE_EMERGENCY_STOP:
             return "STOP ";
         default:
             return "UNKWN";

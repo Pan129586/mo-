@@ -12,7 +12,7 @@ int main(void)
     PID_param_init();
     Encoder_Init();
     reset_turn_count();
-    Trace_Init();
+    run_data_init();
 
     NVIC_EnableIRQ(UART_JY61P_INST_INT_IRQN);   //陀螺仪的串口初始化
     NVIC_EnableIRQ(TIMER_TICK_INST_INT_IRQN);       
@@ -21,7 +21,7 @@ int main(void)
     OLED_Init();
 
     while (1) {
-        Trace_HandleButton();
+        key_change_circle();
         App_ShowTraceStatus();
         Delay_ms(200);
     }

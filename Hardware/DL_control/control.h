@@ -49,7 +49,7 @@
 #define PWM_MAX_PERIOD_COUNT  (PWM_PERIOD_COUNT - 30)
 #define PWM2_MAX_PERIOD_COUNT (PWM2_PERIOD_COUNT - 30)
 
-#define ENCODER_RESOLUTION         (13)       
+#define ENCODER_RESOLUTION         (500)       
 #define ENCODER_TOTAL_RESOLUTION   (ENCODER_RESOLUTION * 4) //四倍频
 #define REDUCTION_RATIO            (28)   //减速比
 #define SPEED_PID_PERIOD           (20)
@@ -58,11 +58,11 @@
 #define BASE                       (60)
 
 typedef enum {
-    TRACE_STATE_IDLE = 0,
-    TRACE_STATE_READY,
-    TRACE_STATE_RUNNING,
-    TRACE_STATE_FINISHED,
-    TRACE_STATE_EMERGENCY_STOP
+    RUN_STATE_IDLE = 0,
+    RUN_STATE_READY,
+    RUN_STATE_RUNNING,
+    RUN_STATE_FINISHED,
+    RUN_STATE_EMERGENCY_STOP
 } trace_state_t;
 
 typedef enum {
@@ -71,20 +71,20 @@ typedef enum {
 } motor_dir_t;
 
 extern volatile trace_state_t g_traceState;
-extern volatile uint8_t g_traceTargetLaps;
-extern volatile uint8_t g_traceCompletedCorners;
-extern volatile uint32_t g_traceRunTicks20ms;
+extern volatile uint8_t g_target_circle;
+extern volatile uint8_t g_compt_corner;
+extern volatile uint32_t g_run_20ms;
 
 extern float Baseleft;
 extern float Baseright;
 extern uint8_t is_motor_en;
 
-void Trace_Init(void);
-void Trace_HandleButton(void);
+void run_data_init(void);
+void key_change_circle(void);
 void Trace_Task20ms(void);
-void Trace_Start(void);
-void Trace_Stop(trace_state_t next_state);
-const char *Trace_GetStateText(void);
+void run_start(void);
+void run_stop(trace_state_t next_state);
+const char *get_runstate(void);
 
 void set_basespeed(float left_base, float right_base);
 void set_motor_speed(uint16_t v);

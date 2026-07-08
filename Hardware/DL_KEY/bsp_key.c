@@ -75,6 +75,7 @@ void ButtonScan(void)
     }
 }
 
+//滴答定时器进行按键消抖
 void SysTick_Handler(void)
 {
     ButtonScan();
