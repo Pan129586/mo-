@@ -5,11 +5,11 @@
 
 
 #define four_corner_count        (4U)    // 跑完一圈需要的直角数
-#define corner_base_speed     (2.0f)     // 遇到直角时的降速目标
-#define lost_base_speed     (2.0f)      // 脱线时的寻线速度
-#define line_base_speed     (2.0f)  
-#define lost_stop_times       (25U)       // 连续脱线多少个时间周期之后认为是迷失并且刹车
-#define corner_wait_time   (45U)       // 直角确认的防抖时间
+#define corner_base_speed     (45.0f)     // 遇到直角时的降速目标
+#define lost_base_speed     (30.0f)      // 脱线时的寻线速度
+#define line_base_speed     (60.0f)  
+#define lost_stop_times       (25)       // 连续脱线多少个时间周期之后认为是迷失并且刹车
+#define corner_wait_time   (45)       // 直角确认的防抖时间
 
  
 float Baseleft = 0.0f;
@@ -187,8 +187,7 @@ void Trace_Task20ms(void)
     float base_speed = select_speed();   //获取不同情况的速度
     set_basespeed(base_speed, base_speed);
 
-    // direct_val = Gray_pd_control();
-    direct_val = 0;
+    direct_val = Gray_pd_control();
 
     speed_target = Baseleft - direct_val;
     speed2_target = Baseright + direct_val;
@@ -196,10 +195,9 @@ void Trace_Task20ms(void)
     set_pid_target(&pid_speed, speed_target);
     set_pid_target(&pid_speed2, speed2_target);
 
-    MotorOutput(100, 100);
-    // MotorPWM = speed_pid_control();
-    // Motor2PWM = speed2_pid_control();
-    // MotorOutput((int)MotorPWM, (int)Motor2PWM);
+    MotorPWM = speed_pid_control();
+    Motor2PWM = speed2_pid_control();
+    MotorOutput((int)MotorPWM, (int)Motor2PWM);
 }
 
 const char *get_runstate(void)
@@ -280,7 +278,9 @@ void MotorOutput(int nMotorPwm, int nMotor2Pwm)
    
     if (nMotorPwm >= 0) {
         set_motor_direction(MOTOR_FWD);
-    } else {
+    } 
+    else 
+    {
         nMotorPwm = -nMotorPwm;
         set_motor_direction(MOTOR_REV);
     }
@@ -304,6 +304,12 @@ void MotorOutput(int nMotorPwm, int nMotor2Pwm)
 
 void set_motor_speed(uint16_t v)
 {
+    uint16_t compare;
+
+    if (v > PWM_PERIOD_COUNT) {
+        v = PWM_PERIOD_COUNT;
+    }
+
     dutyfactor = v;
     SET_COMPAER(v);
 }
@@ -331,6 +337,12 @@ void set_motor_disable(void)
 
 void set_motor2_speed(uint16_t v)
 {
+    uint16_t compare;
+
+    if (v > PWM2_PERIOD_COUNT) {
+        v = PWM2_PERIOD_COUNT;
+    }
+
     dutyfactor2 = v;
     SET2_COMPAER(v);
 }
