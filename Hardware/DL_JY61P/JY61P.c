@@ -20,6 +20,22 @@ volatile uint16_t jy_rx_head = 0;
 static uint16_t jy_rx_tail = 0;
 
 
+void JY61P_DMA_Init(void)
+{
+    jy_rx_head = 0U;
+    jy_rx_tail = 0U;
+
+    DL_DMA_disableChannel(DMA, DMA_CH0_CHAN_ID);
+    DL_DMA_setSrcAddr(DMA, DMA_CH0_CHAN_ID,
+        (uint32_t)&UART_JY61P_INST->RXDATA);
+    DL_DMA_setDestAddr(DMA, DMA_CH0_CHAN_ID, (uint32_t)&jy_rx_buf[0]);
+    DL_DMA_setTransferSize(DMA, DMA_CH0_CHAN_ID, JY_RX_BUF_SIZE);
+    DL_UART_Main_enableDMAReceiveEvent(UART_JY61P_INST,
+        DL_UART_MAIN_DMA_INTERRUPT_RX);
+    DL_DMA_enableChannel(DMA, DMA_CH0_CHAN_ID);
+}
+
+
 static float JY61P_angelturn(float angle)
 {
     if (angle < -180.0f) 
@@ -178,14 +194,21 @@ static void JY61P_receiv(uint8_t ch)
 //串口接收的环形数组
 void JY61P_Poll(void)
 {
-    uint16_t dma_remain = DL_DMA_getTransferSize(DMA, 0);
-    uint16_t current_head = 256 - dma_remain;
-    
+    uint16_t dma_remain = DL_DMA_getTransferSize(DMA, DMA_CH0_CHAN_ID);
+    uint16_t current_head;
 
-    while (jy_rx_tail != jy_rx_head) 
+    if (dma_remain > JY_RX_BUF_SIZE) {
+        return;
+    }
+
+    current_head = (uint16_t)((JY_RX_BUF_SIZE - dma_remain) % JY_RX_BUF_SIZE);
+    jy_rx_head = current_head;
+
+    while (jy_rx_tail != current_head) 
     {
         uint8_t ch = jy_rx_buf[jy_rx_tail];
         jy_rx_tail = (uint16_t)((jy_rx_tail + 1U) % JY_RX_BUF_SIZE);
+        uart_rx_test_count++;
         JY61P_receiv(ch);
     }
 }
@@ -193,11 +216,8 @@ void JY61P_Poll(void)
 void UART_JY61P_INST_IRQHandler(void)
 {
     switch (DL_UART_Main_getPendingInterrupt(UART_JY61P_INST)) {
-        case DL_UART_MAIN_IIDX_RX:
-        uart_rx_test_count++;
-            jy_rx_buf[jy_rx_head] = DL_UART_Main_receiveData(UART_JY61P_INST);
-
-            jy_rx_head = (uint16_t)((jy_rx_head + 1U) % JY_RX_BUF_SIZE);
+        case DL_UART_MAIN_IIDX_DMA_DONE_RX:
+            uart_rx_test_count++;
             break;
         default:
             break;

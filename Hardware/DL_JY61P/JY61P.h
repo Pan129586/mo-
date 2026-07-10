@@ -21,6 +21,7 @@ extern volatile int turn_90_count;
 
 
 void JY61P_Poll(void);
+void JY61P_DMA_Init(void);
 void JY61P_UpdateTurnCounter(void);
 void reset_turn_count(void);
 
