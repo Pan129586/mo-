@@ -4,11 +4,11 @@
 
 //电机1的转动方向
 #ifndef ENCODER_MOTOR1_DIR
-#define ENCODER_MOTOR1_DIR (1)     
+#define ENCODER_MOTOR1_DIR (-1)     
 #endif
 
 #ifndef ENCODER_MOTOR2_DIR
-#define ENCODER_MOTOR2_DIR (1)
+#define ENCODER_MOTOR2_DIR (-1)
 #endif
 
 

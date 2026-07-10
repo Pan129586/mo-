@@ -39,10 +39,11 @@
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
 } while (0)
 
+ //定时器A1跟A
 #define SET_COMPAER(ChannelPulse) \
-    DL_TimerA_setCaptureCompareValue(PWM_MOTOR_INST, (ChannelPulse), DL_TIMER_CC_0_INDEX)
+    DL_TimerA_setCaptureCompareValue(PWMB_INST, (ChannelPulse), DL_TIMER_CC_0_INDEX)
 #define SET2_COMPAER(ChannelPulse) \
-    DL_TimerA_setCaptureCompareValue(PWM_MOTOR_INST, (ChannelPulse), DL_TIMER_CC_1_INDEX)
+    DL_TimerA_setCaptureCompareValue(PWMA_INST, (ChannelPulse), DL_TIMER_CC_1_INDEX)
 
 #define PWM_PERIOD_COUNT      (1000)
 #define PWM2_PERIOD_COUNT     (1000)

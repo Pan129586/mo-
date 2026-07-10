@@ -13,6 +13,8 @@ uint8_t Corner_Rise_Flag = 0;
 uint8_t Lost_Line_Count = 0;
 uint8_t Black_Sensor_Count = 0;
 
+#define ADC_WAIT_TIMEOUT_COUNT 10000U
+
 static uint8_t s_lastCornerFlag = 0;
 static uint8_t s_cornerLockTicks = 0;
 
@@ -55,12 +57,24 @@ void Graysensor_Read_All(void)
 {
     for (uint8_t i = 0; i < 8U; i++) 
     {
+        uint32_t wait_count = 0U;
+
         select_channel(i);
         Delay_us(10);
 
         DL_ADC12_startConversion(ADC12_sensor_INST);        //等待adc的转化
         while (DL_ADC12_getPendingInterrupt(ADC12_sensor_INST) !=
                DL_ADC12_IIDX_MEM0_RESULT_LOADED) {
+            wait_count++;
+            if (wait_count >= ADC_WAIT_TIMEOUT_COUNT) {
+                sensor_values[i] = 0U;
+                break;
+            }
+        }
+
+        //要是后期有影响的话就删掉
+        if (wait_count >= ADC_WAIT_TIMEOUT_COUNT) { 
+            continue;
         }
 
         sensor_values[i] = DL_ADC12_getMemResult(ADC12_sensor_INST, DL_ADC12_MEM_IDX_0);

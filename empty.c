@@ -9,20 +9,22 @@ int main(void)
 {
     
     SYSCFG_DL_init();
-    PID_param_init();
-    Encoder_Init();
-    reset_turn_count();
-    run_data_init();
-
-    NVIC_EnableIRQ(UART_JY61P_INST_INT_IRQN);   //陀螺仪的串口初始化
-    NVIC_EnableIRQ(TIMER_TICK_INST_INT_IRQN);       
-    DL_TimerG_startCounter(TIMER_TICK_INST);
-
     OLED_Init();
+     PID_param_init();
+     Encoder_Init();
+     reset_turn_count();
+     run_data_init();
+
+     NVIC_EnableIRQ(UART_JY61P_INST_INT_IRQN);   //陀螺仪的串口初始化
+     NVIC_EnableIRQ(TIMER_TICK_INST_INT_IRQN);       
+     DL_TimerG_startCounter(TIMER_TICK_INST);
+
 
     while (1) {
-        key_change_circle();
-        App_ShowTraceStatus();
-        Delay_ms(200);
+         key_change_circle();
+         App_ShowTraceStatus();
+        //  OLED_ShowString(10,10,(uint8_t *)"pyq",16);
+    
+        Delay_ms(50);
     }
 }
