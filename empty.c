@@ -22,17 +22,21 @@ int main(void)
      NVIC_EnableIRQ(UART_JY61P_INST_INT_IRQN);   //陀螺仪的串口初始化
      NVIC_EnableIRQ(TIMER_TICK_INST_INT_IRQN);       
      DL_TimerG_startCounter(TIMER_TICK_INST);
+     DL_TimerA_startCounter(PWMA_INST);
+     DL_TimerA_startCounter(PWMB_INST);
 
 
     while (1) {
         
          key_press();
         //  OLED_ShowString(10,10,(uint8_t *)"pyq",16);
-        if ((ui_time - last_show_time) >= 100)
+        if ((ui_time - last_show_time) >= 200)
         {
             last_show_time = ui_time;
             meau_show();
         }
+
+
         
     }
 }

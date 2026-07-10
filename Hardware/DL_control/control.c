@@ -5,9 +5,9 @@
 
 
 #define four_corner_count        (4U)    // 跑完一圈需要的直角数
-#define corner_base_speed     (45.0f)     // 遇到直角时的降速目标
-#define lost_base_speed     (35.0f)      // 脱线时的寻线速度
-#define line_base_speed     (60.0f)  
+#define corner_base_speed     (2.0f)     // 遇到直角时的降速目标
+#define lost_base_speed     (2.0f)      // 脱线时的寻线速度
+#define line_base_speed     (2.0f)  
 #define lost_stop_times       (25U)       // 连续脱线多少个时间周期之后认为是迷失并且刹车
 #define corner_wait_time   (45U)       // 直角确认的防抖时间
 
@@ -136,6 +136,8 @@ void run_start(void)
     ture_wait_time = 0;
     g_lMotorPulseSigma = 0;
     g_lMotor2PulseSigma = 0;
+    Lost_Line_Count = 0;  //发车前清除脱线计时，防止开车钱急停的现象
+
     reset_turn_count();
     rest_pid();
     set_basespeed(line_base_speed, line_base_speed);
@@ -185,16 +187,19 @@ void Trace_Task20ms(void)
     float base_speed = select_speed();   //获取不同情况的速度
     set_basespeed(base_speed, base_speed);
 
-    direct_val = Gray_pd_control();
+    // direct_val = Gray_pd_control();
+    direct_val = 0;
+
     speed_target = Baseleft - direct_val;
     speed2_target = Baseright + direct_val;
 
     set_pid_target(&pid_speed, speed_target);
     set_pid_target(&pid_speed2, speed2_target);
 
-    MotorPWM = speed_pid_control();
-    Motor2PWM = speed2_pid_control();
-    MotorOutput((int)MotorPWM, (int)Motor2PWM);
+    MotorOutput(100, 100);
+    // MotorPWM = speed_pid_control();
+    // Motor2PWM = speed2_pid_control();
+    // MotorOutput((int)MotorPWM, (int)Motor2PWM);
 }
 
 const char *get_runstate(void)

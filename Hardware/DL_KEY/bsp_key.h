@@ -29,7 +29,7 @@ typedef enum
 
 extern volatile uint8_t ui_time;
 extern int iButtonFlag;  
-extern uint8_t g_nButton ;
+extern volatile uint8_t g_nButton ;
 // void KEY_GPIO_Init(void);
 uint8_t KEY_Scan(void);
 

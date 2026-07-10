@@ -8,6 +8,12 @@ uint8_t meau_flag=1;
 void key_press(void)
 {
     uint8_t key=g_nButton;
+    if (key == 0)
+    {
+        return;
+    }
+    g_nButton = 0;
+    
     switch (key)
     {
         case KEY1_PRES:
@@ -60,26 +66,25 @@ void key_press(void)
 
 void run_state_show(void)
 {
-    OLED_ShowString(0, 2,(uint8_t *)get_runstate(),16);
-    OLED_ShowString(40, 2,(uint8_t *)"             ",16);
-
-    OLED_ShowString(0, 4, (uint8_t *)"ciecle:", 16);
-    OLED_ShowNum(20, 4, g_target_circle, 1, 16);
-
-    OLED_ShowString(48, 4, (uint8_t *)"corner_compt:", 16);
-    OLED_ShowNum(68, 4, g_compt_corner, 2, 16);
-    OLED_ShowString(92, 4, (uint8_t *)"            ", 16);
+   OLED_ShowString(0, 0, (uint8_t *)get_runstate(), 16);
+    
+    // 第二行：显示圈数 (Y=2)
+    OLED_ShowString(0, 2, (uint8_t *)"circle:", 16);
+    OLED_ShowNum(56, 2, g_target_circle, 1, 16);
+    
+    OLED_ShowString(0, 4, (uint8_t *)"corner_get:", 16);
+    OLED_ShowNum(88, 4, g_compt_corner, 2, 16);
 }
 
 void YY61P_state_show(void)
 {
-    OLED_ShowString(0, 2, (uint8_t *)"Yaw:", 16);
-    OLED_ShowNum(40, 2, (int)yaw_real, 4, 16); 
-    OLED_ShowString(72, 2, (uint8_t *)"    ", 16); 
+    OLED_ShowString(0, 0, (uint8_t *)"Yaw:", 16);
+    OLED_ShowNum(32, 0, (int)yaw_real, 4, 16); 
 
-    OLED_ShowString(0, 6, (uint8_t *)"T90_count:", 16);
-    OLED_ShowNum(40, 6, turn_90_count, 2, 16);
-    OLED_ShowString(72, 6, (uint8_t *)"    ", 16);
+    OLED_ShowString(0, 2, (uint8_t *)"T90:", 16);
+    OLED_ShowNum(32, 2, turn_90_count, 2, 16);
+    OLED_ShowString(0, 4, (uint8_t *)"pyq", 16);
+
 
 }
 
