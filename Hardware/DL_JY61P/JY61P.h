@@ -22,6 +22,11 @@ extern volatile uint16_t jy_dma_remain_debug;
 extern volatile uint16_t jy_dma_head_debug;
 extern volatile uint32_t jy_frame_53_count;
 extern volatile uint32_t jy_checksum_error_count;
+extern volatile uint8_t jy_last_rx_byte;
+extern volatile uint32_t jy_header_55_count;
+extern volatile uint32_t jy_frame_51_count;
+extern volatile uint32_t jy_frame_52_count;
+extern volatile uint32_t jy_invalid_type_count;
 
 
 void JY61P_Poll(void);

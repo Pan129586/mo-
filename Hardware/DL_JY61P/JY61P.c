@@ -14,6 +14,11 @@ volatile uint16_t jy_dma_remain_debug = 0;
 volatile uint16_t jy_dma_head_debug = 0;
 volatile uint32_t jy_frame_53_count = 0;
 volatile uint32_t jy_checksum_error_count = 0;
+volatile uint8_t jy_last_rx_byte = 0;
+volatile uint32_t jy_header_55_count = 0;
+volatile uint32_t jy_frame_51_count = 0;
+volatile uint32_t jy_frame_52_count = 0;
+volatile uint32_t jy_invalid_type_count = 0;
 
 uint8_t Start_Flag = 0;
 uint8_t uart2_rxbuff = 0;
@@ -156,6 +161,7 @@ static void JY61P_receiv(uint8_t ch)
         case 0:
             if (ch == 0x55U) 
             {
+                jy_header_55_count++;
                 jy_buf[0] = ch;
                 jy_state = 1;
             }
@@ -165,11 +171,23 @@ static void JY61P_receiv(uint8_t ch)
             if (ch == 0x51U || ch == 0x52U || ch == 0x53U) 
             {
                 jy_buf[1] = ch;
+                if (ch == 0x51U) {
+                    jy_frame_51_count++;
+                } else if (ch == 0x52U) {
+                    jy_frame_52_count++;
+                }
                 cnt = 0;
                 jy_state = 2;
             } 
             else 
             {
+                jy_invalid_type_count++;
+                if (ch == 0x55U) {
+                    jy_header_55_count++;
+                    jy_buf[0] = ch;
+                    jy_state = 1;
+                    break;
+                }
                 jy_state = 0;
             }
             break;
@@ -219,6 +237,7 @@ void JY61P_Poll(void)
     {
         uint8_t ch = jy_rx_buf[jy_rx_tail];
         jy_rx_tail = (uint16_t)((jy_rx_tail + 1U) % JY_RX_BUF_SIZE);
+        jy_last_rx_byte = ch;
         uart_rx_test_count++;
         JY61P_receiv(ch);
     }
