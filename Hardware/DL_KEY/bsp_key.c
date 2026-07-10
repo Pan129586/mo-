@@ -62,7 +62,7 @@ void ButtonScan(void)
     if(READ_KEY4)
     {
         if(key4_cnt < 10) key4_cnt++;
-        if(key4_cnt == 10) key4_flag = 1;
+        if(key4_cnt == 10) key4_flag = 1;  //10ms的消抖时间
     }
     else
     {

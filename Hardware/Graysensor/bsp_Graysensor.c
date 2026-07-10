@@ -13,7 +13,7 @@ uint8_t Corner_Rise_Flag = 0;
 uint8_t Lost_Line_Count = 0;
 uint8_t Black_Sensor_Count = 0;
 
-#define ADC_WAIT_TIMEOUT_COUNT 10000U
+#define ADC_WAIT_TIMEOUT_COUNT 1000U
 
 static uint8_t s_lastCornerFlag = 0;
 static uint8_t s_cornerLockTicks = 0;
