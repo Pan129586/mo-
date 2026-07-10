@@ -18,25 +18,31 @@ uint8_t jy_rx_buf[JY_RX_BUF_SIZE];
 volatile uint16_t jy_rx_head = 0;
 static uint16_t jy_rx_tail = 0;
 
-static float JY61P_NormalizeDelta(float delta)
+
+static float JY61P_angelturn(float angle)
 {
-    if (delta < -180.0f) {
-        delta += 360.0f;
-    } else if (delta > 180.0f) {
-        delta -= 360.0f;
+    if (angle < -180.0f) 
+    {
+        angle += 360.0f;
+    }
+    else if (angle > 180.0f) 
+    {
+        angle -= 360.0f;
     }
 
-    return delta;
+    return angle;
 }
 
 static void JY61P_ParseYaw(void)
 {
     uint8_t sum = 0;
 
-    for (uint8_t i = 0; i < 10; i++) {
+    for (uint8_t i = 0; i < 10; i++) 
+    {
         sum += jy_buf[i];
     }
-    if (sum != jy_buf[10]) {
+    if (sum != jy_buf[10]) 
+    {
         return;
     }
 
@@ -55,50 +61,60 @@ void reset_turn_count(void)
 
 void JY61P_UpdateTurnCounter(void)
 {
-    float diff = JY61P_NormalizeDelta(yaw_real - last_yaw);
+    float diff = JY61P_angelturn(yaw_real - last_yaw);
 
-    if (Start_Flag == 1U) {
+    if (Start_Flag == 1U) 
+    {
         total_yaw += diff;
-        turn_90_count = (int)((fabsf(total_yaw) + JY_TURN_COMPLETE_BIAS_DEG) / 90.0f);
+        turn_90_count = (int)((fabsf(total_yaw) +JY_TURN_COMPLETE_BIAS_DEG) / 90.0f);  //计算转过的角度个数，使用90的倍数进行计算
 
-        if (total_yaw >= 0.0f) {
+        if (total_yaw >= 0.0f) 
+        {
             target_yaw = (float)turn_90_count * 90.0f;
-        } else {
-            target_yaw = (float)-turn_90_count * 90.0f;
+        } 
+        else 
+        {
+            target_yaw = (float)-turn_90_count * 90.0f; //
         }
     }
 
     last_yaw = yaw_real;
 }
 
-static void JY61P_DecodeByte(uint8_t ch)
+static void JY61P_receiv(uint8_t ch)
 {
     static uint8_t cnt = 0;
 
-    switch (jy_state) {
+    switch (jy_state) 
+    {
         case 0:
-            if (ch == 0x55U) {
+            if (ch == 0x55U) 
+            {
                 jy_buf[0] = ch;
                 jy_state = 1;
             }
             break;
         case 1:
-            if (ch == 0x53U) {
+            if (ch == 0x53U) 
+            {
                 jy_buf[1] = ch;
                 cnt = 0;
                 jy_state = 2;
-            } else {
+            } 
+            else 
+            {
                 jy_state = 0;
             }
             break;
         case 2:
             jy_buf[2 + cnt] = ch;
             cnt++;
-            if (cnt >= 9U) {
+            if (cnt >= 9U) 
+            {
                 cnt = 0;
                 jy_state = 0;
-                JY61P_ParseYaw();
-                JY61P_UpdateTurnCounter();
+                JY61P_ParseYaw();   //进行校验和
+                JY61P_UpdateTurnCounter();   //更新转过的角度 
             }
             break;
         default:
@@ -108,18 +124,19 @@ static void JY61P_DecodeByte(uint8_t ch)
     }
 }
 
+//串口接收的环形数组
 void JY61P_Poll(void)
 {
-    while (jy_rx_tail != jy_rx_head) {
+    while (jy_rx_tail != jy_rx_head) 
+    {
         uint8_t ch = jy_rx_buf[jy_rx_tail];
         jy_rx_tail = (uint16_t)((jy_rx_tail + 1U) % JY_RX_BUF_SIZE);
-        JY61P_DecodeByte(ch);
+        JY61P_receiv(ch);
     }
 }
 
 void UART_JY61P_INST_IRQHandler(void)
 {
-    /* UART IRQ */
     switch (DL_UART_Main_getPendingInterrupt(UART_JY61P_INST)) {
         case DL_UART_MAIN_IIDX_RX:
             jy_rx_buf[jy_rx_head] = DL_UART_Main_receiveData(UART_JY61P_INST);
@@ -127,5 +144,6 @@ void UART_JY61P_INST_IRQHandler(void)
             break;
         default:
             break;
+            
     }
 }

@@ -8,30 +8,31 @@
 #include "Hardware/DL_pid/bsp_pid.h"
 #include <stdint.h>
 
-
+//前进 （0，1）
 #define SET_FWD  do { \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
+} while (0)
+//后退（1，0）
+#define SET_REV  do { \
     DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
 } while (0)
 
-#define SET_REV  do { \
-    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
-    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
-} while (0)
-
+//停止（0，0）
 #define SET_STOP do { \
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
 } while (0)
 
 #define SET2_FWD  do { \
-    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
-    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
 } while (0)
 
 #define SET2_REV  do { \
-    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
-    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
 } while (0)
 
 #define SET2_STOP do { \
@@ -71,6 +72,9 @@ typedef enum {
     MOTOR_REV,
 } motor_dir_t;
 
+
+extern volatile uint8_t min_circle;
+extern volatile uint8_t maix_circle;
 extern volatile trace_state_t g_traceState;
 extern volatile uint8_t g_target_circle;
 extern volatile uint8_t g_compt_corner;
@@ -81,7 +85,7 @@ extern float Baseright;
 extern uint8_t is_motor_en;
 
 void run_data_init(void);
-void key_change_circle(void);
+// void key_change_circle(void);
 void Trace_Task20ms(void);
 void run_start(void);
 void run_stop(trace_state_t next_state);

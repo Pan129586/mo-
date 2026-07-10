@@ -5,6 +5,10 @@
 #include "Hardware/OLED_Software_I2C/oled_software_i2c.h"
 #include "Hardware/OLED_Software_I2C/meau.h"
 
+
+uint32_t last_show_time = 0;
+
+
 int main(void)
 {
     
@@ -21,10 +25,14 @@ int main(void)
 
 
     while (1) {
-         key_change_circle();
-         App_ShowTraceStatus();
+        
+         key_press();
         //  OLED_ShowString(10,10,(uint8_t *)"pyq",16);
-    
-        Delay_ms(50);
+        if ((ui_time - last_show_time) >= 100)
+        {
+            last_show_time = ui_time;
+            meau_show();
+        }
+        
     }
 }

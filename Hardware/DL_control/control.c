@@ -4,11 +4,10 @@
 #include <math.h>
 
 
-#define min_circle              (1U)    // 最小行驶圈数
-#define maix_circle              (2U)
 #define four_corner_count        (4U)    // 跑完一圈需要的直角数
 #define corner_base_speed     (45.0f)     // 遇到直角时的降速目标
 #define lost_base_speed     (35.0f)      // 脱线时的寻线速度
+#define line_base_speed     (60.0f)  
 #define lost_stop_times       (25U)       // 连续脱线多少个时间周期之后认为是迷失并且刹车
 #define corner_wait_time   (45U)       // 直角确认的防抖时间
 
@@ -28,6 +27,9 @@ static uint16_t dutyfactor2 = 0;
 
 uint8_t is_motor_en = 0;
 uint8_t is_motor2_en = 0;
+
+volatile uint8_t min_circle = 1;  //定义圈数
+volatile uint8_t maix_circle =5;
 
 volatile trace_state_t g_traceState = RUN_STATE_READY;
 volatile uint8_t g_target_circle = 1;
@@ -110,7 +112,7 @@ static float select_speed(void)
     }
 
     // 正常直线行驶
-    return (float)BASE;
+    return line_base_speed;  //（60）
 }
 
 
@@ -136,7 +138,7 @@ void run_start(void)
     g_lMotor2PulseSigma = 0;
     reset_turn_count();
     rest_pid();
-    set_basespeed((float)BASE, (float)BASE);
+    set_basespeed(line_base_speed, line_base_speed);
     Start_Flag = 1;
     g_traceState = RUN_STATE_RUNNING;
 }
@@ -148,60 +150,6 @@ void run_stop(trace_state_t next_state)
     rest_pid();
     g_traceState = next_state;
 }
-
-void key_change_circle(void)
-{
-    uint8_t key = g_nButton;
-
-    if (key == 0U) 
-    {
-        return;
-    }
-    g_nButton = 0;
-
-    switch (key) 
-    {
-        case KEY1_PRES:
-            if (g_traceState != RUN_STATE_RUNNING)
-             {
-                if (g_target_circle < maix_circle) 
-                {
-                    g_target_circle++;
-                }
-                g_traceState = RUN_STATE_READY;
-            }
-            break;
-        case KEY2_PRES:
-            if (g_traceState != RUN_STATE_RUNNING) 
-            {
-                if (g_target_circle > min_circle) 
-                {
-                    g_target_circle--;
-                }
-                g_traceState = RUN_STATE_READY;
-            }
-            break;
-        case KEY3_PRES:
-            if (g_traceState != RUN_STATE_RUNNING) 
-            {
-                run_start();
-            }
-            break;
-        case KEY4_PRES:
-            if (g_traceState == RUN_STATE_RUNNING) 
-            {
-                run_stop(RUN_STATE_EMERGENCY_STOP);
-            } 
-            else 
-            {
-                run_data_init();
-            }
-            break;
-        default:
-            break;
-    }
-}
-
 
 void Trace_Task20ms(void)
 {
@@ -234,7 +182,7 @@ void Trace_Task20ms(void)
         return;
     }
 
-    float base_speed = select_speed();
+    float base_speed = select_speed();   //获取不同情况的速度
     set_basespeed(base_speed, base_speed);
 
     direct_val = Gray_pd_control();
@@ -324,7 +272,7 @@ void Send_To_VOFA(float target_left, float real_left, float target_right,
 
 void MotorOutput(int nMotorPwm, int nMotor2Pwm)
 {
-    /* Motor Output */
+   
     if (nMotorPwm >= 0) {
         set_motor_direction(MOTOR_FWD);
     } else {

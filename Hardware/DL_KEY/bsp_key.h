@@ -26,6 +26,8 @@ typedef enum
   KEY0_DOWN = 1,
 }KEYState_TypeDef;
  
+
+extern volatile uint8_t ui_time;
 extern int iButtonFlag;  
 extern uint8_t g_nButton ;
 // void KEY_GPIO_Init(void);
