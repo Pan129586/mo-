@@ -78,8 +78,11 @@ void run_state_show(void)
 
 void YY61P_state_show(void)
 {
-    OLED_ShowString(0, 0, (uint8_t *)"Yaw:", 16);
-    OLED_ShowNum(32, 0, (int)yaw_real, 4, 16); 
+    // OLED_ShowString(0, 0,  (uint8_t *)"Yaw:", 16);
+    // OLED_ShowNum(32, 0, yaw_real, 4, 16); 
+    OLED_ShowString(0, 0,  (uint8_t *)"Yaw:", 16);
+    OLED_ShowNum(32, 0,uart_rx_test_count , 4, 16); 
+
 
     OLED_ShowString(0, 2, (uint8_t *)"T90:", 16);
     OLED_ShowNum(32, 2, turn_90_count, 2, 16);

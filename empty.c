@@ -4,6 +4,8 @@
 #include "Hardware/DL_Emcoder/Encoder.h"
 #include "Hardware/OLED_Software_I2C/oled_software_i2c.h"
 #include "Hardware/OLED_Software_I2C/meau.h"
+#include "Hardware/DL_JY61P/JY61P.h"
+
 
 
 uint32_t last_show_time = 0;
@@ -26,6 +28,9 @@ int main(void)
      DL_TimerA_startCounter(PWMA_INST);
      DL_TimerA_startCounter(PWMB_INST);
 
+     DL_DMA_enableChannel(DMA,DMA_CH0_CHAN_ID);
+     DL_UART_Main_enableDMAReceiveEvent(UART_JY61P_INST,DMA_CH0_CHAN_ID);
+
 
     while (1) {
         
@@ -36,6 +41,7 @@ int main(void)
             last_show_time = ui_time;
             meau_show();
         }
+        
 
         
     }

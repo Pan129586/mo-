@@ -12,7 +12,7 @@ extern uint8_t uart2_rxbuff;
 extern uint8_t jy_rx_buf[JY_RX_BUF_SIZE];
 extern volatile uint16_t jy_rx_head;
 
-
+extern volatile uint32_t uart_rx_test_count;
 extern volatile float yaw_real;
 extern volatile float total_yaw;
 extern volatile float last_yaw;
