@@ -10,6 +10,10 @@ volatile float total_yaw = 0.0f;
 volatile float last_yaw = 0.0f;
 volatile float target_yaw = 0.0f;
 volatile int turn_90_count = 0;
+volatile uint16_t jy_dma_remain_debug = 0;
+volatile uint16_t jy_dma_head_debug = 0;
+volatile uint32_t jy_frame_53_count = 0;
+volatile uint32_t jy_checksum_error_count = 0;
 
 uint8_t Start_Flag = 0;
 uint8_t uart2_rxbuff = 0;
@@ -50,7 +54,7 @@ static float JY61P_angelturn(float angle)
     return angle;
 }
 
-static void JY61P_ParseYaw(void)
+static uint8_t JY61P_ParseYaw(void)
 {
     uint8_t sum = 0;
 
@@ -60,11 +64,13 @@ static void JY61P_ParseYaw(void)
     }
     if (sum != jy_buf[10]) 
     {
-        return;
+        jy_checksum_error_count++;
+        return 0U;
     }
 
     int16_t yaw_raw = ((int16_t)jy_buf[7] << 8) | jy_buf[6];
     yaw_real = (float)yaw_raw / 32768.0f * 180.0f;
+    return 1U;
 }
 
 
@@ -179,8 +185,10 @@ static void JY61P_receiv(uint8_t ch)
                 // 只有当这一帧是角度包(0x53)的时候，才进行解析
                 if (jy_buf[1] == 0x53U) 
                 {
-                    JY61P_ParseYaw();          // 校验并计算 yaw_real
-                    JY61P_UpdateTurnCounter(); // 更新转角累计
+                    jy_frame_53_count++;
+                    if (JY61P_ParseYaw() != 0U) {
+                        JY61P_UpdateTurnCounter(); // 更新转角累计
+                    }
                 }
             }
             break;
@@ -197,12 +205,15 @@ void JY61P_Poll(void)
     uint16_t dma_remain = DL_DMA_getTransferSize(DMA, DMA_CH0_CHAN_ID);
     uint16_t current_head;
 
+    jy_dma_remain_debug = dma_remain;
+
     if (dma_remain > JY_RX_BUF_SIZE) {
         return;
     }
 
     current_head = (uint16_t)((JY_RX_BUF_SIZE - dma_remain) % JY_RX_BUF_SIZE);
     jy_rx_head = current_head;
+    jy_dma_head_debug = current_head;
 
     while (jy_rx_tail != current_head) 
     {
@@ -217,7 +228,7 @@ void UART_JY61P_INST_IRQHandler(void)
 {
     switch (DL_UART_Main_getPendingInterrupt(UART_JY61P_INST)) {
         case DL_UART_MAIN_IIDX_DMA_DONE_RX:
-            uart_rx_test_count++;
+            // uart_rx_test_count++;
             break;
         default:
             break;

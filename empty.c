@@ -28,8 +28,7 @@ int main(void)
      DL_TimerA_startCounter(PWMA_INST);
      DL_TimerA_startCounter(PWMB_INST);
 
-     DL_DMA_enableChannel(DMA,DMA_CH0_CHAN_ID);
-     DL_UART_Main_enableDMAReceiveEvent(UART_JY61P_INST,DMA_CH0_CHAN_ID);
+     JY61P_DMA_Init();
 
 
     while (1) {
