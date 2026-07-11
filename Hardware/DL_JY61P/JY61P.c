@@ -44,7 +44,7 @@ void JY61P_DMA_Init(void)
 }
 
 
-static float JY61P_angelturn(float angle)
+ float JY61P_angelturn(float angle)
 {
     if (angle < -180.0f) 
     {

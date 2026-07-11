@@ -4,11 +4,22 @@
 _pid pid_speed, pid_speed2,low_pid_speed,low_pid_speed2;    
 _pid pid_direct;
 _pid pid_position,pid_position2;  
-
+_pid pid_angle;
 
 
 void PID_param_init()
 {
+  //角度
+   pid_direct.target_val=0.0;				
+    pid_direct.actual_val=0.0;
+    pid_direct.err=0.0;
+    pid_direct.err_last=0.0;
+    pid_direct.integral=0.0;
+
+		pid_direct.Kp = 0.65;
+		pid_direct.Ki = 0.0;
+		pid_direct.Kd = 0.24;
+
 
     pid_direct.target_val=0.0;				
     pid_direct.actual_val=0.0;
@@ -54,7 +65,7 @@ void PID_param_init()
 	pid_position.Ki = 0.0;   
 	pid_position.Kd = 0.1;  
 	
-	pid_position2.target_val = 0.0;				
+	 pid_position2.target_val = 0.0;				
     pid_position2.actual_val = 0.0;
     pid_position2.err = 0.0;
     pid_position2.err_last = 0.0;
@@ -93,6 +104,21 @@ void set_p_i_d(_pid *pid, float p, float i, float d)
   	pid->Kp = p;    
 		pid->Ki = i;    
 		pid->Kd = d;   
+}
+
+
+float yaw_pid_realize(_pid *pid, float actual_val) 
+{
+
+    pid->err = pid->target_val - actual_val;
+
+    pid->actual_val = pid->Kp * pid->err + pid->Kd * (pid->err - pid->err_last);
+    pid->err_last = pid->err;
+
+    if(pid->actual_val > 150) pid->actual_val = 150; 
+    else if(pid->actual_val < -150) pid->actual_val = -150;
+
+    return pid->actual_val;
 }
 
 

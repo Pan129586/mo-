@@ -37,6 +37,7 @@ volatile uint8_t g_compt_corner = 0;
 volatile uint32_t g_run_20ms = 0;
 
 static uint8_t ture_wait_time = 0;
+volatile uint32_t  time_20ms_flag=0;
 
 static float vofa_data[5];
 static uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7F};
@@ -47,6 +48,8 @@ static uint8_t totall_corners(void)
 {
     return (uint8_t)(g_target_circle * four_corner_count);
 }
+
+
 
 
 
@@ -156,9 +159,9 @@ void run_stop(trace_state_t next_state)
 void Trace_Task20ms(void)
 {
    
-    JY61P_Poll();
+    JY61P_Poll();   //里面有死等
     GetMotorPulse();
-    Light_Turn_control();
+    Light_Turn_control();   //读取灰度adc的死等
 
     if (g_traceState != RUN_STATE_RUNNING) 
     {
@@ -187,7 +190,7 @@ void Trace_Task20ms(void)
     float base_speed = select_speed();   //获取不同情况的速度
     set_basespeed(base_speed, base_speed);
 
-    direct_val = Gray_pd_control();
+    direct_val = Gray_pd_control();   //
 
     speed_target = Baseleft - direct_val;
     speed2_target = Baseright + direct_val;
@@ -224,6 +227,7 @@ void TIMER_TICK_INST_IRQHandler(void)
     switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST)) 
     {
         case DL_TIMER_IIDX_ZERO:
+            time_20ms_flag =1;   
             Trace_Task20ms();
             break;
         default:

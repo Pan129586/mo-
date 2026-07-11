@@ -34,5 +34,6 @@ void JY61P_Poll(void);
 void JY61P_DMA_Init(void);
 void JY61P_UpdateTurnCounter(void);
 void reset_turn_count(void);
+float JY61P_angelturn(float angle);
 
 #endif

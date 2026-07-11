@@ -76,10 +76,10 @@ void run_state_show(void)
     OLED_ShowString(0, 4, (uint8_t *)"corner_get:", 16);
     OLED_ShowNum(88, 4, g_compt_corner, 2, 16);
 
-    OLED_ShowString(0, 6, (uint8_t *)"P:", 16);
-    str_buf[0] = get_trace_phase_char();
-    str_buf[1] = '\0';
-    OLED_ShowString(16, 6, (uint8_t *)str_buf, 16);
+    // OLED_ShowString(0, 6, (uint8_t *)"P:", 16);
+    // str_buf[0] = get_trace_phase_char();
+    // str_buf[1] = '\0';
+    // OLED_ShowString(16, 6, (uint8_t *)str_buf, 16);
 }
 
 void YY61P_state_show(void)
