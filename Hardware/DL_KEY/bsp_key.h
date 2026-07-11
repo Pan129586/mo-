@@ -27,7 +27,7 @@ typedef enum
 }KEYState_TypeDef;
  
 
-extern volatile uint8_t ui_time;
+extern volatile uint32_t ui_time;
 extern int iButtonFlag;  
 extern volatile uint8_t g_nButton ;
 // void KEY_GPIO_Init(void);

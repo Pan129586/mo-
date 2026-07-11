@@ -24,6 +24,7 @@ void key_press(void)
                 meau_flag =1;
             }
             OLED_Clear();
+            meau_show();
         break;
         case KEY2_PRES:
             if (g_traceState != RUN_STATE_RUNNING)
@@ -120,7 +121,6 @@ void meau_show(void)
 
 }
    
-
 
 
 

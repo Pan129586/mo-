@@ -2,7 +2,7 @@
 int iButtonCount;
 int iButtonFlag;
 volatile uint8_t g_nButton; 
-volatile uint8_t ui_time=0;   
+volatile uint32_t ui_time = 0U;
 
 static uint8_t key1_cnt = 0, key2_cnt = 0, key3_cnt = 0,key4_cnt=0;
 static uint8_t key1_flag = 0, key2_flag = 0, key3_flag = 0, key4_flag = 0;

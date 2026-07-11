@@ -10,13 +10,13 @@
 
 //前进 （0，1）
 #define SET_FWD  do { \
-    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
-    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
 } while (0)
 //后退（1，0）
 #define SET_REV  do { \
-    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
-    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
 } while (0)
 
 //停止（0，0）
@@ -26,13 +26,13 @@
 } while (0)
 
 #define SET2_FWD  do { \
-    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
-    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
 } while (0)
 
 #define SET2_REV  do { \
-    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
-    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
 } while (0)
 
 #define SET2_STOP do { \
@@ -86,6 +86,7 @@ extern volatile trace_phase_t g_tracePhase;
 extern volatile uint8_t g_target_circle;
 extern volatile uint8_t g_compt_corner;
 extern volatile uint32_t  time_20ms_flag; //定时器任务标志位
+extern volatile uint32_t g_trace_overrun_count;
 extern volatile uint32_t g_run_20ms;
 extern volatile float g_turn_target_yaw;
 extern volatile float g_turn_yaw_error;

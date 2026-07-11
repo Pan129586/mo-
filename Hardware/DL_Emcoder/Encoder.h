@@ -7,6 +7,7 @@ extern volatile long g_lMotorPulseSigma;
 extern volatile long g_lMotor2PulseSigma;
 extern volatile short g_nMotorPulse;
 extern volatile short g_nMotor2Pulse;
+extern volatile uint32_t encoder_irq_count;
 
 void Encoder_Init(void);
 void GetMotorPulse(void);

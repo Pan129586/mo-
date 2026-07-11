@@ -5,9 +5,9 @@
 
 
 #define four_corner_count        (4U)    // 跑完一圈需要的直角数
-#define corner_base_speed     (45.0f)     // 遇到直角时的降速目标
-#define lost_base_speed     (30.0f)      // 脱线时的寻线速度
-#define line_base_speed     (60.0f)  
+#define corner_base_speed     (30.0f)     // 遇到直角时的降速目标
+#define lost_base_speed     (25.0f)      // 脱线时的寻线速度
+#define line_base_speed     (45.0f)  
 // #define lost_stop_times       (25)       // 连续脱线多少个时间周期之后认为是迷失并且刹车
 
 /* Yaw Turn Config */
@@ -54,6 +54,7 @@ volatile float g_turn_yaw_error = 0.0f;
 volatile float lost_stop_times = 25U;
 
 volatile uint32_t  time_20ms_flag=0;
+volatile uint32_t g_trace_overrun_count = 0U;
 static uint16_t s_phase_ticks = 0U;
 static uint16_t s_yaw_stale_ticks = 0U;
 static uint8_t s_turn_settle_ticks = 0U;
@@ -348,8 +349,6 @@ void run_stop(trace_state_t next_state)
 
 void Trace_Task20ms(void)
 {
-   
-    JY61P_Poll();   //里面有死等
     GetMotorPulse();
     Light_Turn_control();   //读取灰度adc的死等
 
@@ -433,8 +432,14 @@ void TIMER_TICK_INST_IRQHandler(void)
     switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST)) 
     {
         case DL_TIMER_IIDX_ZERO:
-            // time_20ms_flag = 1U;
-            // Trace_Task20ms();
+            if (time_20ms_flag != 0U)
+            {
+                g_trace_overrun_count++;
+            }
+            else
+            {
+                time_20ms_flag = 1U;
+            }
             break;
         default:
             break;
@@ -486,23 +491,32 @@ void Send_To_VOFA(float target_left, float real_left, float target_right,
 void MotorOutput(int nMotorPwm, int nMotor2Pwm)
 {
    
-    if (nMotorPwm >= 0) {
+    if (nMotorPwm > 0) {
         set_motor_direction(MOTOR_FWD);
-    } 
-    else 
+    }
+    else if (nMotorPwm < 0)
     {
         nMotorPwm = -nMotorPwm;
         set_motor_direction(MOTOR_REV);
+    }
+    else
+    {
+        SET_STOP;
     }
     if (nMotorPwm > PWM_MAX_PERIOD_COUNT) {
         nMotorPwm = PWM_MAX_PERIOD_COUNT;
     }
 
-    if (nMotor2Pwm >= 0) {
+    if (nMotor2Pwm > 0) {
         set_motor2_direction(MOTOR_FWD);
-    } else {
+    }
+    else if (nMotor2Pwm < 0) {
         nMotor2Pwm = -nMotor2Pwm;
         set_motor2_direction(MOTOR_REV);
+    }
+    else
+    {
+        SET2_STOP;
     }
     if (nMotor2Pwm > PWM2_MAX_PERIOD_COUNT) {
         nMotor2Pwm = PWM2_MAX_PERIOD_COUNT;
@@ -514,13 +528,12 @@ void MotorOutput(int nMotorPwm, int nMotor2Pwm)
 
 void set_motor_speed(uint16_t v)
 {
-    uint16_t compare;
 
     if (v > PWM_PERIOD_COUNT) {
         v = PWM_PERIOD_COUNT;
     }
-
     dutyfactor = v;
+
     SET_COMPAER(v);
 }
 
@@ -547,13 +560,11 @@ void set_motor_disable(void)
 
 void set_motor2_speed(uint16_t v)
 {
-    uint16_t compare;
 
     if (v > PWM2_PERIOD_COUNT) {
         v = PWM2_PERIOD_COUNT;
     }
-
-    dutyfactor2 = v;
+    dutyfactor = v;
     SET2_COMPAER(v);
 }
 

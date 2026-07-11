@@ -2,35 +2,26 @@
 
 #include <stdint.h>
 
-//编码器的计数方向
+/* Encoder Direction */
 #ifndef ENCODER_MOTOR1_DIR
-#define ENCODER_MOTOR1_DIR (1)     
+#define ENCODER_MOTOR1_DIR (-1L)
 #endif
 
 #ifndef ENCODER_MOTOR2_DIR
-#define ENCODER_MOTOR2_DIR (1)
+#define ENCODER_MOTOR2_DIR (-1L)
 #endif
 
+#define ENCODER_X4_EQUIVALENT_SCALE (2L)
+#define ENCODER_ISR_DRAIN_LIMIT      (4U)
 
-
-volatile long g_lMotorPulseSigma = 0;   // 电机1总累计脉冲（绝对位置）
+volatile long g_lMotorPulseSigma = 0;
 volatile long g_lMotor2PulseSigma = 0;
-volatile short g_nMotorPulse = 0;           // 电机1当前周期内的脉冲数（速度）
+volatile short g_nMotorPulse = 0;
 volatile short g_nMotor2Pulse = 0;
+volatile uint32_t encoder_irq_count = 0U;
 
-
-//底层中断内使用的计数器与状态
-static volatile long s_motorPulseCount = 0;   // 电机1底层中断脉冲累加器
+static volatile long s_motorPulseCount = 0;
 static volatile long s_motor2PulseCount = 0;
-static volatile uint8_t s_motorState = 0;       // 电机1上一次的A/B相电平状态
-static volatile uint8_t s_motor2State = 0;
-
-static const int8_t g_encoderTransitionTable[16] = {
-    0,  1, -1,  0,
-   -1,  0,  0,  1,
-    1,  0,  0, -1,
-    0, -1,  1,  0
-};
 
 static uint32_t Encoder_EnterCritical(void)
 {
@@ -40,84 +31,70 @@ static uint32_t Encoder_EnterCritical(void)
     return primask;
 }
 
-
-
 static void Encoder_ExitCritical(uint32_t primask)
 {
-    if (primask == 0U) {
+    if (primask == 0U)
+    {
         __enable_irq();
     }
 }
 
-//读取电机1引脚状态
-static uint8_t Encoder_ReadMotorState(void)
+static uint8_t Encoder_ReadPin(GPIO_Regs *port, uint32_t pin)
 {
-    uint8_t phaseA = (DL_GPIO_readPins(GPIO_Encoder_PH_A_PORT,
-                          GPIO_Encoder_PH_A_PIN) != 0U) ? 1U : 0U;
-    uint8_t phaseB = (DL_GPIO_readPins(GPIO_Encoder_PH_B_PORT,
-                          GPIO_Encoder_PH_B_PIN) != 0U) ? 1U : 0U;
-
-    return (uint8_t)((phaseA << 1U) | phaseB);
+    return (DL_GPIO_readPins(port, pin) != 0U) ? 1U : 0U;
 }
 
-
-static uint8_t Encoder_ReadMotor2State(void)
-{
-    uint8_t phaseA = (DL_GPIO_readPins(GPIO_Encoder_BH_A_PORT,
-                          GPIO_Encoder_BH_A_PIN) != 0U) ? 1U : 0U;
-    uint8_t phaseB = (DL_GPIO_readPins(GPIO_Encoder_BH_B_PORT,
-                          GPIO_Encoder_BH_B_PIN) != 0U) ? 1U : 0U;
-
-    return (uint8_t)((phaseA << 1U) | phaseB);
-}
-
-//更新电机1脉冲计数值
+/* A-phase double-edge decoding; B-phase is direction only. */
 static void Encoder_UpdateMotorCount(void)
 {
-    uint8_t state = Encoder_ReadMotorState();
-    // 计算矩阵索引：将旧状态左移2位，并与新状态进行按位或。
-    int8_t delta = g_encoderTransitionTable[((uint8_t)s_motorState << 2U) | state];
+    uint8_t phaseA = Encoder_ReadPin(GPIO_Encoder_PH_A_PORT,
+                                     GPIO_Encoder_PH_A_PIN);
+    uint8_t phaseB = Encoder_ReadPin(GPIO_Encoder_PH_B_PORT,
+                                     GPIO_Encoder_PH_B_PIN);
+    long delta = (phaseA == phaseB) ? 1L : -1L;
 
-    s_motorState = state;
-    // 脉冲数 = 状态变化值(-1,0,1) * 电机方向系数
-    s_motorPulseCount += ((long)delta * ENCODER_MOTOR1_DIR);
+    s_motorPulseCount += delta * ENCODER_MOTOR1_DIR *
+                         ENCODER_X4_EQUIVALENT_SCALE;
 }
 
 static void Encoder_UpdateMotor2Count(void)
 {
-    uint8_t state = Encoder_ReadMotor2State();
-    int8_t delta = g_encoderTransitionTable[((uint8_t)s_motor2State << 2U) | state];
+    uint8_t phaseA = Encoder_ReadPin(GPIO_Encoder_BH_A_PORT,
+                                     GPIO_Encoder_BH_A_PIN);
+    uint8_t phaseB = Encoder_ReadPin(GPIO_Encoder_BH_B_PORT,
+                                     GPIO_Encoder_BH_B_PIN);
+    long delta = (phaseA == phaseB) ? 1L : -1L;
 
-    s_motor2State = state;
-    s_motor2PulseCount += ((long)delta * ENCODER_MOTOR2_DIR);
-}
-
-//GPIO A 端口产生的中断
-static void Encoder_HandleGPIOAInterrupt(void)
-{
-    switch (DL_GPIO_getPendingInterrupt(GPIOA)) {
-        case GPIO_Encoder_PH_B_IIDX:
-            Encoder_UpdateMotorCount();
-            break;
-        case GPIO_Encoder_BH_B_IIDX:
-            Encoder_UpdateMotor2Count();
-            break;
-        default:
-            break;
-    }
+    s_motor2PulseCount += delta * ENCODER_MOTOR2_DIR *
+                          ENCODER_X4_EQUIVALENT_SCALE;
 }
 
 static void Encoder_HandleGPIOBInterrupt(void)
 {
-    switch (DL_GPIO_getPendingInterrupt(GPIOB)) {
-        case GPIO_Encoder_PH_A_IIDX:
-            Encoder_UpdateMotorCount();
+    uint8_t handled = 0U;
+
+    while (handled < ENCODER_ISR_DRAIN_LIMIT)
+    {
+        uint32_t pending = DL_GPIO_getPendingInterrupt(GPIOB);
+
+        if (pending == DL_GPIO_IIDX_NO_INTR)
+        {
             break;
-        case GPIO_Encoder_BH_A_IIDX:
-            Encoder_UpdateMotor2Count();
-            break;
-        default:
-            break;
+        }
+
+        encoder_irq_count++;
+        handled++;
+        switch (pending)
+        {
+            case GPIO_Encoder_PH_A_IIDX:
+                Encoder_UpdateMotorCount();
+                break;
+            case GPIO_Encoder_BH_A_IIDX:
+                Encoder_UpdateMotor2Count();
+                break;
+            default:
+                break;
+        }
     }
 }
 
@@ -131,33 +108,41 @@ void Encoder_Init(void)
     g_nMotor2Pulse = 0;
     g_lMotorPulseSigma = 0;
     g_lMotor2PulseSigma = 0;
-    s_motorState = Encoder_ReadMotorState();
-    s_motor2State = Encoder_ReadMotor2State();
+    encoder_irq_count = 0U;
 
+    DL_GPIO_initDigitalInputFeatures(GPIO_Encoder_PH_A_IOMUX,
+        DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
+        DL_GPIO_HYSTERESIS_ENABLE, DL_GPIO_WAKEUP_DISABLE);
+    DL_GPIO_initDigitalInputFeatures(GPIO_Encoder_PH_B_IOMUX,
+        DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
+        DL_GPIO_HYSTERESIS_ENABLE, DL_GPIO_WAKEUP_DISABLE);
+    DL_GPIO_initDigitalInputFeatures(GPIO_Encoder_BH_A_IOMUX,
+        DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
+        DL_GPIO_HYSTERESIS_ENABLE, DL_GPIO_WAKEUP_DISABLE);
+    DL_GPIO_initDigitalInputFeatures(GPIO_Encoder_BH_B_IOMUX,
+        DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
+        DL_GPIO_HYSTERESIS_ENABLE, DL_GPIO_WAKEUP_DISABLE);
+
+    DL_GPIO_disableInterrupt(GPIOA,
+        GPIO_Encoder_PH_B_PIN | GPIO_Encoder_BH_B_PIN);
     DL_GPIO_clearInterruptStatus(GPIOA,
         GPIO_Encoder_PH_B_PIN | GPIO_Encoder_BH_B_PIN);
     DL_GPIO_clearInterruptStatus(GPIOB,
         GPIO_Encoder_PH_A_PIN | GPIO_Encoder_BH_A_PIN);
-    DL_GPIO_enableInterrupt(GPIOA,
-        GPIO_Encoder_PH_B_PIN | GPIO_Encoder_BH_B_PIN);
     DL_GPIO_enableInterrupt(GPIOB,
         GPIO_Encoder_PH_A_PIN | GPIO_Encoder_BH_A_PIN);
 
-    NVIC_ClearPendingIRQ(GPIO_Encoder_GPIOA_INT_IRQN);
-    NVIC_ClearPendingIRQ(GPIO_Encoder_GPIOB_INT_IRQN);
-    NVIC_EnableIRQ(GPIO_Encoder_GPIOA_INT_IRQN);
-    NVIC_EnableIRQ(GPIO_Encoder_GPIOB_INT_IRQN);
+    NVIC_ClearPendingIRQ(GPIO_Encoder_INT_IRQN);
+    NVIC_SetPriority(GPIO_Encoder_INT_IRQN, 3U);
+    NVIC_EnableIRQ(GPIO_Encoder_INT_IRQN);
 
     Encoder_ExitCritical(primask);
 }
 
-
-//获取脉冲数据
 void GetMotorPulse(void)
 {
     long motorPulse;
     long motor2Pulse;
-
     uint32_t primask = Encoder_EnterCritical();
 
     motorPulse = s_motorPulseCount;
@@ -174,11 +159,9 @@ void GetMotorPulse(void)
 
 void GROUP1_IRQHandler(void)
 {
-    switch (DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP_1)) {
-        case GPIO_Encoder_GPIOA_INT_IIDX:
-            Encoder_HandleGPIOAInterrupt();
-            break;
-        case GPIO_Encoder_GPIOB_INT_IIDX:
+    switch (DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP_1))
+    {
+        case GPIO_Encoder_INT_IIDX:
             Encoder_HandleGPIOBInterrupt();
             break;
         default:
