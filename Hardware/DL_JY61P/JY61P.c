@@ -2,7 +2,7 @@
 
 #include <math.h>
 
-#define JY_TURN_COMPLETE_BIAS_DEG (10.0f)
+#define JY_TURN_COMPLETE_BIAS_DEG (10.0f)  //10°的误差值，要是小车稳的话可以不需要误差值
 
 volatile uint32_t uart_rx_test_count = 0;
 volatile float yaw_real = 0.0f;
@@ -13,6 +13,7 @@ volatile int turn_90_count = 0;
 volatile uint16_t jy_dma_remain_debug = 0;
 volatile uint16_t jy_dma_head_debug = 0;
 volatile uint32_t jy_frame_53_count = 0;
+volatile uint32_t jy_valid_yaw_count = 0;
 volatile uint32_t jy_checksum_error_count = 0;
 volatile uint8_t jy_last_rx_byte = 0;
 volatile uint32_t jy_header_55_count = 0;
@@ -31,16 +32,14 @@ static uint16_t jy_rx_tail = 0;
 
 void JY61P_DMA_Init(void)
 {
-    jy_rx_head = 0U;
-    jy_rx_tail = 0U;
+    jy_rx_head = 0;
+    jy_rx_tail = 0;
 
     DL_DMA_disableChannel(DMA, DMA_CH0_CHAN_ID);
-    DL_DMA_setSrcAddr(DMA, DMA_CH0_CHAN_ID,
-        (uint32_t)&UART_JY61P_INST->RXDATA);
+    DL_DMA_setSrcAddr(DMA, DMA_CH0_CHAN_ID,(uint32_t)&UART_JY61P_INST->RXDATA);
     DL_DMA_setDestAddr(DMA, DMA_CH0_CHAN_ID, (uint32_t)&jy_rx_buf[0]);
     DL_DMA_setTransferSize(DMA, DMA_CH0_CHAN_ID, JY_RX_BUF_SIZE);
-    DL_UART_Main_enableDMAReceiveEvent(UART_JY61P_INST,
-        DL_UART_MAIN_DMA_INTERRUPT_RX);
+    DL_UART_Main_enableDMAReceiveEvent(UART_JY61P_INST,DL_UART_MAIN_DMA_INTERRUPT_RX);
     DL_DMA_enableChannel(DMA, DMA_CH0_CHAN_ID);
 }
 
@@ -91,10 +90,10 @@ void JY61P_UpdateTurnCounter(void)
 {
     float diff = JY61P_angelturn(yaw_real - last_yaw);
 
-    if (Start_Flag == 1U) 
+    if (Start_Flag == 1) 
     {
         total_yaw += diff;
-        turn_90_count = (int)((fabsf(total_yaw) +JY_TURN_COMPLETE_BIAS_DEG) / 90.0f);  //计算转过的角度个数，使用90的倍数进行计算
+        turn_90_count = (int)((fabsf(total_yaw) +JY_TURN_COMPLETE_BIAS_DEG) / 90.0f);  
 
         if (total_yaw >= 0.0f) 
         {
@@ -109,48 +108,7 @@ void JY61P_UpdateTurnCounter(void)
     last_yaw = yaw_real;
 }
 
-// static void JY61P_receiv(uint8_t ch)
-// {
-//     static uint8_t cnt = 0;
 
-//     switch (jy_state) 
-//     {
-//         case 0:
-//             if (ch == 0x55U) 
-//             {
-//                 jy_buf[0] = ch;
-//                 jy_state = 1;
-//             }
-//             break;
-//         case 1:
-//             if (ch == 0x53U) 
-//             {
-//                 jy_buf[1] = ch;
-//                 cnt = 0;
-//                 jy_state = 2;
-//             } 
-//             else 
-//             {
-//                 jy_state = 0;
-//             }
-//             break;
-//         case 2:
-//             jy_buf[2 + cnt] = ch;
-//             cnt++;
-//             if (cnt >= 9U) 
-//             {
-//                 cnt = 0;
-//                 jy_state = 0;
-//                 JY61P_ParseYaw();   //进行校验和
-//                 JY61P_UpdateTurnCounter();   //更新转过的角度 
-//             }
-//             break;
-//         default:
-//             cnt = 0;
-//             jy_state = 0;
-//             break;
-//     }
-// }
 
 static void JY61P_receiv(uint8_t ch)
 {
@@ -167,13 +125,16 @@ static void JY61P_receiv(uint8_t ch)
             }
             break;
         case 1:
-            // 兼容加速度、角速度、角度三种包头，防止错位
+            // 加速度、角速度、角度三种包头
             if (ch == 0x51U || ch == 0x52U || ch == 0x53U) 
             {
                 jy_buf[1] = ch;
-                if (ch == 0x51U) {
+                if (ch == 0x51U)
+                {
                     jy_frame_51_count++;
-                } else if (ch == 0x52U) {
+                } 
+                else if (ch == 0x52U) 
+                {
                     jy_frame_52_count++;
                 }
                 cnt = 0;
@@ -182,7 +143,8 @@ static void JY61P_receiv(uint8_t ch)
             else 
             {
                 jy_invalid_type_count++;
-                if (ch == 0x55U) {
+                if (ch == 0x55U) 
+                {
                     jy_header_55_count++;
                     jy_buf[0] = ch;
                     jy_state = 1;
@@ -195,16 +157,17 @@ static void JY61P_receiv(uint8_t ch)
             jy_buf[2 + cnt] = ch;
             cnt++;
             // 凑齐一帧的 11 个字节了
-            if (cnt >= 9U) 
+            if (cnt >= 9) 
             {
                 cnt = 0;
                 jy_state = 0;
                 
-                // 只有当这一帧是角度包(0x53)的时候，才进行解析
                 if (jy_buf[1] == 0x53U) 
                 {
                     jy_frame_53_count++;
-                    if (JY61P_ParseYaw() != 0U) {
+                    if (JY61P_ParseYaw() != 0U) 
+                    {
+                        jy_valid_yaw_count++;
                         JY61P_UpdateTurnCounter(); // 更新转角累计
                     }
                 }
@@ -225,12 +188,14 @@ void JY61P_Poll(void)
 
     jy_dma_remain_debug = dma_remain;
 
-    if (dma_remain > JY_RX_BUF_SIZE) {
+    if (dma_remain > JY_RX_BUF_SIZE) 
+    {
         return;
     }
 
     current_head = (uint16_t)((JY_RX_BUF_SIZE - dma_remain) % JY_RX_BUF_SIZE);
     jy_rx_head = current_head;
+
     jy_dma_head_debug = current_head;
 
     while (jy_rx_tail != current_head) 
@@ -245,7 +210,8 @@ void JY61P_Poll(void)
 
 void UART_JY61P_INST_IRQHandler(void)
 {
-    switch (DL_UART_Main_getPendingInterrupt(UART_JY61P_INST)) {
+    switch (DL_UART_Main_getPendingInterrupt(UART_JY61P_INST)) 
+    {
         case DL_UART_MAIN_IIDX_DMA_DONE_RX:
             // uart_rx_test_count++;
             break;

@@ -1,6 +1,7 @@
 #include "Hardware/OLED_Software_I2C/meau.h"
 
 uint8_t meau_flag=1;
+char str_buf[16];
 
 
 
@@ -74,12 +75,20 @@ void run_state_show(void)
     
     OLED_ShowString(0, 4, (uint8_t *)"corner_get:", 16);
     OLED_ShowNum(88, 4, g_compt_corner, 2, 16);
+
+    OLED_ShowString(0, 6, (uint8_t *)"P:", 16);
+    str_buf[0] = get_trace_phase_char();
+    str_buf[1] = '\0';
+    OLED_ShowString(16, 6, (uint8_t *)str_buf, 16);
 }
 
 void YY61P_state_show(void)
 {
-    OLED_ShowString(0, 0,  (uint8_t *)"Yaw:", 16);
-    OLED_ShowNum(32, 0, yaw_real, 4, 16); 
+    sprintf(str_buf, "Yaw: %.2f", yaw_real); 
+    OLED_ShowString(0, 0, (uint8_t *)str_buf, 16);
+
+    // OLED_ShowString(0, 0,  (uint8_t *)"Yaw:", 16);
+    // OLED_ShowNum(32, 0, (float)yaw_real, 4, 16); 
     // OLED_ShowString(0, 0,  (uint8_t *)"Yaw:", 16);
     // OLED_ShowNum(32, 0,uart_rx_test_count , 4, 16); 
 
@@ -111,7 +120,6 @@ void meau_show(void)
 
 }
    
-
 
 
 

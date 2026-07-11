@@ -25,7 +25,7 @@ extern _pid pid_speed, pid_speed2;
 extern _pid pid_direct;
 extern _pid pid_position,pid_position2;
 
-void PID_reset(_pid *pid);
+void PID_reset(_pid *pid);   //清除pid对应的参数积累数值
  void PID_param_init(void);
  void set_pid_target(_pid *pid, float temp_val);
  float get_pid_target(_pid *pid);

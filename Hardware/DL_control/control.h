@@ -68,6 +68,12 @@ typedef enum {
 } trace_state_t;
 
 typedef enum {
+    TRACE_PHASE_LINE = 0,
+    TRACE_PHASE_YAW_TURN,
+    TRACE_PHASE_REACQUIRE
+} trace_phase_t;
+
+typedef enum {
     MOTOR_FWD = 0,
     MOTOR_REV,
 } motor_dir_t;
@@ -76,9 +82,12 @@ typedef enum {
 extern volatile uint8_t min_circle;
 extern volatile uint8_t maix_circle;
 extern volatile trace_state_t g_traceState;
+extern volatile trace_phase_t g_tracePhase;
 extern volatile uint8_t g_target_circle;
 extern volatile uint8_t g_compt_corner;
 extern volatile uint32_t g_run_20ms;
+extern volatile float g_turn_target_yaw;
+extern volatile float g_turn_yaw_error;
 
 extern float Baseleft;
 extern float Baseright;
@@ -90,6 +99,7 @@ void Trace_Task20ms(void);
 void run_start(void);
 void run_stop(trace_state_t next_state);
 const char *get_runstate(void);
+char get_trace_phase_char(void);
 
 void set_basespeed(float left_base, float right_base);
 void set_motor_speed(uint16_t v);

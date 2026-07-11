@@ -66,10 +66,10 @@ static void updata_corner_count(void)
 {
     // 获取底层识别到的直角总数
 
-    uint8_t yaw_corners = 0U;
+    uint8_t yaw_corners = 0;
     if(turn_90_count<0)
     {
-        yaw_corners = 0U;
+        yaw_corners = 0;
     }
     else 
     {
@@ -77,7 +77,7 @@ static void updata_corner_count(void)
     }
 
     // 如果检测到直角信号上升沿（刚压到直角线）
-    if (Corner_Rise_Flag != 0U) 
+    if (Corner_Rise_Flag != 0) 
     {
         // 开启防抖窗口，在此窗口时间内，允许更新计数值
         ture_wait_time = corner_wait_time;
@@ -89,7 +89,7 @@ static void updata_corner_count(void)
 
     // 只有当底层直角数增加了，并且 (还在防抖窗口内 或者 传感器当前正压着直角线)
     if ((yaw_corners > g_compt_corner) &&
-        ((ture_wait_time > 0U) || (Corner_Flag != 0U))) 
+        ((ture_wait_time > 0) || (Corner_Flag != 0))) 
         {
            //确认有效，更新已完成的直角总数
         g_compt_corner = yaw_corners;
@@ -141,14 +141,14 @@ void run_start(void)
     reset_turn_count();
     rest_pid();
     set_basespeed(line_base_speed, line_base_speed);
-    Start_Flag = 1;
-    g_traceState = RUN_STATE_RUNNING;
+    Start_Flag = 1; 
+    g_traceState = RUN_STATE_RUNNING;    
 }
 
 void run_stop(trace_state_t next_state)
 {
     Start_Flag = 0;
-    set_basespeed(0.0f, 0.0f);
+    set_basespeed(0.0f, 0.0f);    //基础速度？还是设置目标速度
     rest_pid();
     g_traceState = next_state;
 }
@@ -173,7 +173,7 @@ void Trace_Task20ms(void)
     if (g_compt_corner >= totall_corners())
     {
         run_stop(RUN_STATE_FINISHED);   //停车
-
+        
         //该位置后面加入瞄准部分的开启激光
         return;
     }
