@@ -9,16 +9,15 @@ _pid pid_angle;
 
 void PID_param_init()
 {
-  //角度
-   pid_direct.target_val=0.0;				
-    pid_direct.actual_val=0.0;
-    pid_direct.err=0.0;
-    pid_direct.err_last=0.0;
-    pid_direct.integral=0.0;
-
-		pid_direct.Kp = 0.65;
-		pid_direct.Ki = 0.0;
-		pid_direct.Kd = 0.24;
+    // Angle PID
+    pid_angle.target_val = 0.0f;
+    pid_angle.actual_val = 0.0f;
+    pid_angle.err = 0.0f;
+    pid_angle.err_last = 0.0f;
+    pid_angle.integral = 0.0f;
+    pid_angle.Kp = 0.65f;
+    pid_angle.Ki = 0.0f;
+    pid_angle.Kd = 0.24f;
 
 
     pid_direct.target_val=0.0;				

@@ -58,6 +58,7 @@ void JY61P_DMA_Init(void)
     return angle;
 }
 
+
 static uint8_t JY61P_ParseYaw(void)
 {
     uint8_t sum = 0;

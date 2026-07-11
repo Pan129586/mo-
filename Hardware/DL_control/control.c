@@ -8,8 +8,21 @@
 #define corner_base_speed     (45.0f)     // 遇到直角时的降速目标
 #define lost_base_speed     (30.0f)      // 脱线时的寻线速度
 #define line_base_speed     (60.0f)  
-#define lost_stop_times       (25)       // 连续脱线多少个时间周期之后认为是迷失并且刹车
-#define corner_wait_time   (45)       // 直角确认的防抖时间
+// #define lost_stop_times       (25)       // 连续脱线多少个时间周期之后认为是迷失并且刹车
+
+/* Yaw Turn Config */
+#ifndef TRACE_TURN_DIR
+#define TRACE_TURN_DIR             (1.0f)
+#endif
+#define TRACE_TURN_ANGLE_DEG       (90.0f)
+#define TRACE_TURN_TOLERANCE_DEG   (6.0f)
+#define TRACE_TURN_SETTLE_TICKS    (3U)
+#define TRACE_TURN_TIMEOUT_TICKS   (75U)
+#define TRACE_YAW_STALE_TICKS      (25U)
+#define TRACE_REACQUIRE_SPEED      (28.0f)
+#define TRACE_REACQUIRE_STEER_MAX  (12.0f)
+#define TRACE_REACQUIRE_OK_TICKS   (3U)
+#define TRACE_REACQUIRE_TIMEOUT    (50U)
 
  
 float Baseleft = 0.0f;
@@ -32,12 +45,20 @@ volatile uint8_t min_circle = 1;  //定义圈数
 volatile uint8_t maix_circle =5;
 
 volatile trace_state_t g_traceState = RUN_STATE_READY;
+volatile trace_phase_t g_tracePhase = TRACE_PHASE_LINE;
 volatile uint8_t g_target_circle = 1;
 volatile uint8_t g_compt_corner = 0;
 volatile uint32_t g_run_20ms = 0;
+volatile float g_turn_target_yaw = 0.0f;
+volatile float g_turn_yaw_error = 0.0f;
+volatile float lost_stop_times = 25U;
 
-static uint8_t ture_wait_time = 0;
 volatile uint32_t  time_20ms_flag=0;
+static uint16_t s_phase_ticks = 0U;
+static uint16_t s_yaw_stale_ticks = 0U;
+static uint8_t s_turn_settle_ticks = 0U;
+static uint8_t s_reacquire_ok_ticks = 0U;
+static uint32_t s_last_yaw_frame_count = 0U;
 
 static float vofa_data[5];
 static uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7F};
@@ -60,11 +81,13 @@ static void rest_pid(void)
     PID_reset(&pid_speed);
     PID_reset(&pid_speed2);
     PID_reset(&pid_direct);
+    PID_reset(&pid_angle);
     MotorOutput(0, 0);
 }
 
 
 //直角计圈防抖
+#if 0
 static void updata_corner_count(void)
 {
     // 获取底层识别到的直角总数
@@ -100,6 +123,172 @@ static void updata_corner_count(void)
     }
 }
 
+#endif
+
+
+static void reset_trace_phase(void)
+{
+    g_tracePhase = TRACE_PHASE_LINE;
+    g_turn_target_yaw = total_yaw;
+    g_turn_yaw_error = 0.0f;
+    s_phase_ticks = 0U;
+    s_yaw_stale_ticks = 0U;
+    s_turn_settle_ticks = 0U;
+    s_reacquire_ok_ticks = 0U;
+    s_last_yaw_frame_count = jy_valid_yaw_count;
+
+    set_pid_target(&pid_angle, total_yaw);
+    PID_reset(&pid_angle);
+}
+
+ void apply_speed_targets(float left_target, float right_target)
+{
+    speed_target = left_target;
+    speed2_target = right_target;
+
+    set_pid_target(&pid_speed, speed_target);
+    set_pid_target(&pid_speed2, speed2_target);
+
+    MotorPWM = speed_pid_control();
+    Motor2PWM = speed2_pid_control();
+    MotorOutput((int)MotorPWM, (int)Motor2PWM);
+}
+
+ void enter_yaw_turn(void)
+{
+    g_tracePhase = TRACE_PHASE_YAW_TURN;
+
+    g_turn_target_yaw = total_yaw + (TRACE_TURN_DIR * TRACE_TURN_ANGLE_DEG);
+    g_turn_yaw_error = g_turn_target_yaw - total_yaw;
+    s_phase_ticks = 0U;
+    s_yaw_stale_ticks = 0U;
+    s_turn_settle_ticks = 0U;
+    s_last_yaw_frame_count = jy_valid_yaw_count;
+    PID_reset(&pid_angle);
+    PID_reset(&pid_speed);
+    PID_reset(&pid_speed2);
+    PID_reset(&pid_direct);
+    set_pid_target(&pid_angle, g_turn_target_yaw);
+}
+
+ void enter_reacquire(void)
+{
+    g_tracePhase = TRACE_PHASE_REACQUIRE;
+    s_phase_ticks = 0U;
+    s_reacquire_ok_ticks = 0U;
+    PID_reset(&pid_angle);
+    PID_reset(&pid_speed);
+    PID_reset(&pid_speed2);
+    PID_reset(&pid_direct);
+}
+
+ void yaw_turn_control(void)
+{
+    float turn_output;
+
+    s_phase_ticks++;
+    if (jy_valid_yaw_count != s_last_yaw_frame_count)
+    {
+        s_last_yaw_frame_count = jy_valid_yaw_count;
+        s_yaw_stale_ticks = 0U;
+    }
+    else if (s_yaw_stale_ticks < UINT16_MAX)
+    {
+        s_yaw_stale_ticks++;
+    }
+
+    if ((s_phase_ticks >= TRACE_TURN_TIMEOUT_TICKS) ||
+        (s_yaw_stale_ticks >= TRACE_YAW_STALE_TICKS))
+    {
+        run_stop(RUN_STATE_EMERGENCY_STOP);
+        return;
+    }
+
+    g_turn_yaw_error = g_turn_target_yaw - total_yaw;
+    if (fabsf(g_turn_yaw_error) <= TRACE_TURN_TOLERANCE_DEG)
+    {
+        if (s_turn_settle_ticks == 0U)
+        {
+            PID_reset(&pid_speed);
+            PID_reset(&pid_speed2);
+        }
+        if (s_turn_settle_ticks < UINT8_MAX)
+        {
+            s_turn_settle_ticks++;
+        }
+        MotorOutput(0, 0);
+
+        if (s_turn_settle_ticks >= TRACE_TURN_SETTLE_TICKS)
+        {
+            if (g_compt_corner < UINT8_MAX)
+            {
+                g_compt_corner++;
+            }
+            if (g_compt_corner >= totall_corners())
+            {
+                run_stop(RUN_STATE_FINISHED);
+            }
+            else
+            {
+                enter_reacquire();
+            }
+        }
+        return;
+    }
+
+    if (s_turn_settle_ticks != 0U)
+    {
+        s_turn_settle_ticks = 0U;
+        PID_reset(&pid_speed);
+        PID_reset(&pid_speed2);
+    }
+    turn_output = yaw_pid_realize(&pid_angle, total_yaw);
+    apply_speed_targets(-turn_output, turn_output);
+}
+
+ void reacquire_line_control(void)
+{
+    float steer;
+
+    s_phase_ticks++;
+    if ((Black_Sensor_Count > 0U) && (Corner_Flag == 0U))
+    {
+        if (s_reacquire_ok_ticks < UINT8_MAX)
+        {
+            s_reacquire_ok_ticks++;
+        }
+    }
+    else
+    {
+        s_reacquire_ok_ticks = 0U;
+    }
+
+    if (s_reacquire_ok_ticks >= TRACE_REACQUIRE_OK_TICKS)
+    {
+        g_tracePhase = TRACE_PHASE_LINE;
+        s_phase_ticks = 0U;
+        PID_reset(&pid_direct);
+        return;
+    }
+    if (s_phase_ticks >= TRACE_REACQUIRE_TIMEOUT)
+    {
+        run_stop(RUN_STATE_EMERGENCY_STOP);
+        return;
+    }
+
+    steer = Gray_pd_control();
+    if (steer > TRACE_REACQUIRE_STEER_MAX)
+    {
+        steer = TRACE_REACQUIRE_STEER_MAX;
+    }
+    else if (steer < -TRACE_REACQUIRE_STEER_MAX)
+    {
+        steer = -TRACE_REACQUIRE_STEER_MAX;
+    }
+    apply_speed_targets(TRACE_REACQUIRE_SPEED - steer,
+                        TRACE_REACQUIRE_SPEED + steer);
+}
+
 static float select_speed(void)
 {
     //如果处于脱线状态，切入极低速寻线模式
@@ -125,8 +314,8 @@ void run_data_init(void)
     g_target_circle = 1;
     g_compt_corner = 0;
     g_run_20ms = 0;
-    ture_wait_time = 0;
     Start_Flag = 0;
+    reset_trace_phase();
     set_basespeed(0.0f, 0.0f);
     rest_pid();
 }
@@ -136,12 +325,12 @@ void run_start(void)
 {
     g_compt_corner = 0;
     g_run_20ms = 0;
-    ture_wait_time = 0;
     g_lMotorPulseSigma = 0;
     g_lMotor2PulseSigma = 0;
     Lost_Line_Count = 0;  //发车前清除脱线计时，防止开车钱急停的现象
 
     reset_turn_count();
+    reset_trace_phase();
     rest_pid();
     set_basespeed(line_base_speed, line_base_speed);
     Start_Flag = 1; 
@@ -153,6 +342,7 @@ void run_stop(trace_state_t next_state)
     Start_Flag = 0;
     set_basespeed(0.0f, 0.0f);    //基础速度？还是设置目标速度
     rest_pid();
+    reset_trace_phase();
     g_traceState = next_state;
 }
 
@@ -169,19 +359,25 @@ void Trace_Task20ms(void)
         return;
     }
 
-    g_run_20ms++;  //用来计时小车跑圈的时间
-    updata_corner_count();
+    g_run_20ms++;
 
-    //完成的直角数目大于目标的直角数目
-    if (g_compt_corner >= totall_corners())
+    if (g_tracePhase == TRACE_PHASE_YAW_TURN)
     {
-        run_stop(RUN_STATE_FINISHED);   //停车
-        
-        //该位置后面加入瞄准部分的开启激光
+        yaw_turn_control();
         return;
     }
-
-    if (Lost_Line_Count >= lost_stop_times) 
+    if (g_tracePhase == TRACE_PHASE_REACQUIRE)
+    {
+        reacquire_line_control();
+        return;
+    }
+    if (Corner_Rise_Flag == 1)   //检测到直角
+    {
+        enter_yaw_turn();
+        yaw_turn_control();
+        return;
+    }
+    if (Lost_Line_Count >= lost_stop_times)
     {
         run_stop(RUN_STATE_EMERGENCY_STOP);
         return;
@@ -195,12 +391,7 @@ void Trace_Task20ms(void)
     speed_target = Baseleft - direct_val;
     speed2_target = Baseright + direct_val;
 
-    set_pid_target(&pid_speed, speed_target);
-    set_pid_target(&pid_speed2, speed2_target);
-
-    MotorPWM = speed_pid_control();
-    Motor2PWM = speed2_pid_control();
-    MotorOutput((int)MotorPWM, (int)Motor2PWM);
+    apply_speed_targets(speed_target, speed2_target);
 }
 
 const char *get_runstate(void)
@@ -222,13 +413,28 @@ const char *get_runstate(void)
     }
 }
 
+char get_trace_phase_char(void)
+{
+    switch (g_tracePhase)
+    {
+        case TRACE_PHASE_LINE:
+            return 'L';
+        case TRACE_PHASE_YAW_TURN:
+            return 'T';
+        case TRACE_PHASE_REACQUIRE:
+            return 'R';
+        default:
+            return '?';
+    }
+}
+
 void TIMER_TICK_INST_IRQHandler(void)
 {
     switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST)) 
     {
         case DL_TIMER_IIDX_ZERO:
-            time_20ms_flag =1;   
-            Trace_Task20ms();
+            // time_20ms_flag = 1U;
+            // Trace_Task20ms();
             break;
         default:
             break;

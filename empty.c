@@ -5,10 +5,12 @@
 #include "Hardware/OLED_Software_I2C/oled_software_i2c.h"
 #include "Hardware/OLED_Software_I2C/meau.h"
 #include "Hardware/DL_JY61P/JY61P.h"
+#include "Hardware/Graysensor/bsp_Graysensor.h"
 
 
 
-uint32_t last_show_time = 0;
+uint8_t last_show_time = 0;
+// uint8_t Lost_Line_Count = 0;
 
 
 int main(void)
@@ -32,26 +34,18 @@ int main(void)
 
 
     while (1) {
-        
-        //  key_press();
-        //  OLED_ShowString(10,10,(uint8_t *)"pyq",16);
+
+        // if(time_20ms_flag == 1)
+        // {
+            
+        // }
+         key_press();
         if ((ui_time - last_show_time) >= 200)
         {
             last_show_time = ui_time;
             meau_show();
         }
+        // MotorOutput(200, 200);
 
-        if(time_20ms_flag==1)
-        {
-            time_20ms_flag =0;
-            if(Corner_Flag ==1&& g_tracePhase == TRACE_PHASE_LINE)
-            {
-                
-            }
-
-        }
-        
-        key_press();
-        
     }
 }

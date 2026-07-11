@@ -85,9 +85,11 @@ extern volatile trace_state_t g_traceState;
 extern volatile trace_phase_t g_tracePhase;
 extern volatile uint8_t g_target_circle;
 extern volatile uint8_t g_compt_corner;
+extern volatile uint32_t  time_20ms_flag; //定时器任务标志位
 extern volatile uint32_t g_run_20ms;
 extern volatile float g_turn_target_yaw;
 extern volatile float g_turn_yaw_error;
+extern volatile float lost_stop_times;
 
 extern float Baseleft;
 extern float Baseright;
@@ -116,5 +118,9 @@ float speed2_pid_control(void);
 void MotorOutput(int nMotorPwm, int nMotor2Pwm);
 void Send_To_VOFA(float target_left, float real_left, float target_right,
                   float real_right, float line_num);
+
+ void enter_yaw_turn(void);
+  void yaw_turn_control(void);
+ void reacquire_line_control(void);
 
 #endif

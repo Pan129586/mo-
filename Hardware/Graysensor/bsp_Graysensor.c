@@ -147,11 +147,11 @@ void Light_Turn_control(void)
         s_lastCornerFlag = raw_corner;
     }
 
-    if (Corner_Flag == 0U) 
+    if (Corner_Flag == 0) 
     {
         s_lastCornerFlag = 0;
     }
-    if (s_cornerLockTicks > 0U) 
+    if (s_cornerLockTicks > 0) 
     {
         s_cornerLockTicks--;
     }

@@ -34,6 +34,7 @@ void PID_reset(_pid *pid);   //清除pid对应的参数积累数值
 
 
 float direct_pid_realize(_pid *pid, float actual_val);
+float yaw_pid_realize(_pid *pid, float actual_val);
 float speed_pid_realize(_pid *pid, float actual_val);
 float position_pid_realize(_pid *pid, float actual_val);
 
