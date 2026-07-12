@@ -19,7 +19,7 @@ static uint8_t s_lastCornerFlag = 0;
 static uint8_t s_cornerLockTicks = 0;
 
 static const float sensor_weight[8] = {
-    -32.0f, -22.0f, -10.0f, -5.0f, 5.0f, 10.0f, 22.0f, 32.0f
+    0.0f, 0.0f, -10.0f, -5.0f, 5.0f, 10.0f, 0.0f, 0.0f
 };
 
 void select_channel(uint8_t channel)
@@ -52,6 +52,8 @@ void select_channel(uint8_t channel)
         DL_GPIO_clearPins(GPIO_SENSOR_AD2_PORT, GPIO_SENSOR_AD2_PIN);
     }
 }
+
+
 
 void Graysensor_Read_All(void)
 {

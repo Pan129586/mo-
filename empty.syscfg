@@ -36,6 +36,21 @@ const UART4   = UART.addInstance();
 /**
  * Write custom configuration values to the imported modules.
  */
+const divider6       = system.clockTree["PLL_CLK2X_DIV"];
+divider6.divideValue = 4;
+
+const divider7       = system.clockTree["PLL_PDIV"];
+divider7.divideValue = 2;
+
+const divider9       = system.clockTree["UDIV"];
+divider9.divideValue = 2;
+
+const multiplier2         = system.clockTree["PLL_QDIV"];
+multiplier2.multiplyValue = 10;
+
+const mux8       = system.clockTree["HSCLKMUX"];
+mux8.inputSelect = "HSCLKMUX_SYSPLL2X";
+
 ADC121.$name                             = "ADC12_sensor";
 ADC121.sampleTime1                       = "0. ms";
 ADC121.sampleTime0                       = "0.01 ms";
@@ -84,11 +99,10 @@ GPIO3.associatedPins[0].direction    = "INPUT";
 GPIO3.associatedPins[0].assignedPort = "PORTB";
 GPIO3.associatedPins[0].assignedPin  = "13";
 GPIO3.associatedPins[0].interruptEn  = true;
-GPIO3.associatedPins[0].polarity     = "RISE_FALL";
 GPIO3.associatedPins[0].$name        = "PH_A";
+GPIO3.associatedPins[0].polarity     = "RISE_FALL";
 GPIO3.associatedPins[1].$name        = "PH_B";
 GPIO3.associatedPins[1].direction    = "INPUT";
-GPIO3.associatedPins[1].interruptEn  = false;
 GPIO3.associatedPins[1].assignedPort = "PORTA";
 GPIO3.associatedPins[1].assignedPin  = "13";
 GPIO3.associatedPins[1].pin.$assign  = "PA13";
@@ -96,7 +110,6 @@ GPIO3.associatedPins[2].$name        = "BH_B";
 GPIO3.associatedPins[2].assignedPort = "PORTA";
 GPIO3.associatedPins[2].assignedPin  = "12";
 GPIO3.associatedPins[2].direction    = "INPUT";
-GPIO3.associatedPins[2].interruptEn  = false;
 GPIO3.associatedPins[2].pin.$assign  = "PA12";
 GPIO3.associatedPins[3].direction    = "INPUT";
 GPIO3.associatedPins[3].assignedPort = "PORTB";
@@ -178,6 +191,7 @@ PWM1.ccIndex                            = [0];
 PWM1.$name                              = "PWMB";
 PWM1.timerStartTimer                    = true;
 PWM1.pwmMode                            = "EDGE_ALIGN_UP";
+PWM1.clockDivider                       = 4;
 PWM1.PWM_CHANNEL_0.$name                = "ti_driverlib_pwm_PWMTimerCC0";
 PWM1.PWM_CHANNEL_0.dutyCycle            = 0;
 PWM1.PWM_CHANNEL_0.shadowUpdateMode     = "ZERO_EVT";
@@ -193,6 +207,8 @@ PWM2.$name                              = "PWMA";
 PWM2.ccIndex                            = [1];
 PWM2.timerStartTimer                    = true;
 PWM2.pwmMode                            = "EDGE_ALIGN_UP";
+PWM2.clockDivider                       = 4;
+PWM2.clockDivider                       = 4;
 PWM2.ccp1PinConfig.direction            = scripting.forceWrite("OUTPUT");
 PWM2.ccp1PinConfig.hideOutputInversion  = scripting.forceWrite(false);
 PWM2.ccp1PinConfig.onlyInternalResistor = scripting.forceWrite(false);
@@ -200,12 +216,12 @@ PWM2.ccp1PinConfig.passedPeripheralType = scripting.forceWrite("Digital");
 PWM2.ccp1PinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric2";
 PWM2.PWM_CHANNEL_1.$name                = "ti_driverlib_pwm_PWMTimerCC1";
 PWM2.PWM_CHANNEL_1.shadowUpdateMode     = "ZERO_EVT";
-PWM2.PWM_CHANNEL_1.ccValue              = 0;
 
 SYSCTL.forceDefaultClkConfig = true;
+SYSCTL.clockTreeEn           = true;
 
 SYSTICK.periodEnable      = true;
-SYSTICK.period            = 32000;
+SYSTICK.period            = 80000;
 SYSTICK.systickEnable     = true;
 SYSTICK.interruptEnable   = true;
 SYSTICK.interruptPriority = "3";
@@ -313,6 +329,5 @@ GPIO7.associatedPins[1].pin.$suggestSolution     = "PB20";
 GPIO8.associatedPins[0].pin.$suggestSolution     = "PB21";
 PWM2.peripheral.$suggestSolution                 = "TIMA1";
 PWM2.peripheral.ccp1Pin.$suggestSolution         = "PB1";
-SYSCTL.peripheral.$suggestSolution               = "SYSCTL";
 UART1.DMA_CHANNEL_RX.peripheral.$suggestSolution = "DMA_CH0";
 UART3.peripheral.$suggestSolution                = "UART3";

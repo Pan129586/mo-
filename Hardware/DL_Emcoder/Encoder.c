@@ -8,17 +8,22 @@
 #endif
 
 #ifndef ENCODER_MOTOR2_DIR
-#define ENCODER_MOTOR2_DIR (-1L)
+#define ENCODER_MOTOR2_DIR (1L)
 #endif
 
-#define ENCODER_X4_EQUIVALENT_SCALE (2L)
-#define ENCODER_ISR_DRAIN_LIMIT      (4U)
+
+#define ENCODER_X4_EQUIVALENT_SCALE (2L)   //脉冲数值*了2
+#define ENCODER_ISR_DRAIN_LIMIT      (4U)  //
+#define ENCODER_PI                    (3.1415926f)
+
 
 volatile long g_lMotorPulseSigma = 0;
 volatile long g_lMotor2PulseSigma = 0;
 volatile short g_nMotorPulse = 0;
 volatile short g_nMotor2Pulse = 0;
 volatile uint32_t encoder_irq_count = 0U;
+volatile float g_fMotorSpeedCmps = 0.0f;
+volatile float g_fMotor2SpeedCmps = 0.0f;
 
 static volatile long s_motorPulseCount = 0;
 static volatile long s_motor2PulseCount = 0;
@@ -54,7 +59,7 @@ static void Encoder_UpdateMotorCount(void)
     long delta = (phaseA == phaseB) ? 1L : -1L;
 
     s_motorPulseCount += delta * ENCODER_MOTOR1_DIR *
-                         ENCODER_X4_EQUIVALENT_SCALE;
+                         ENCODER_X4_EQUIVALENT_SCALE;   //
 }
 
 static void Encoder_UpdateMotor2Count(void)
@@ -109,6 +114,8 @@ void Encoder_Init(void)
     g_lMotorPulseSigma = 0;
     g_lMotor2PulseSigma = 0;
     encoder_irq_count = 0U;
+    g_fMotorSpeedCmps = 0.0f;
+    g_fMotor2SpeedCmps = 0.0f;
 
     DL_GPIO_initDigitalInputFeatures(GPIO_Encoder_PH_A_IOMUX,
         DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
@@ -155,6 +162,13 @@ void GetMotorPulse(void)
     g_nMotor2Pulse = (short)motor2Pulse;
     g_lMotorPulseSigma += g_nMotorPulse;
     g_lMotor2PulseSigma += g_nMotor2Pulse;
+    //把脉冲换算成速度
+    g_fMotorSpeedCmps = ((float)g_nMotorPulse * 2.0f * ENCODER_PI *
+        ENCODER_WHEEL_RADIUS_CM * 1000.0f) /
+        ((float)ENCODER_WHEEL_PULSES_REV * (float)ENCODER_SAMPLE_PERIOD_MS);
+    g_fMotor2SpeedCmps = ((float)g_nMotor2Pulse * 2.0f * ENCODER_PI *
+        ENCODER_WHEEL_RADIUS_CM * 1000.0f) /
+        ((float)ENCODER_WHEEL_PULSES_REV * (float)ENCODER_SAMPLE_PERIOD_MS);
 }
 
 void GROUP1_IRQHandler(void)

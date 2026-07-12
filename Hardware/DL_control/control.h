@@ -8,16 +8,34 @@
 #include "Hardware/DL_pid/bsp_pid.h"
 #include <stdint.h>
 
-//前进 （0，1）
+/* Motor Direction Config: positive PWM always means vehicle forward. */
+#ifndef MOTOR1_FORWARD_REVERSED
+#define MOTOR1_FORWARD_REVERSED (0U)
+#endif
+
+#ifndef MOTOR2_FORWARD_REVERSED
+#define MOTOR2_FORWARD_REVERSED (0U)
+#endif
+
+#if MOTOR1_FORWARD_REVERSED
+#define SET_FWD  do { \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
+} while (0)
+#define SET_REV  do { \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
+} while (0)
+#else
 #define SET_FWD  do { \
     DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
 } while (0)
-//后退（1，0）
 #define SET_REV  do { \
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN1_PIN); \
     DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
 } while (0)
+#endif
 
 //停止（0，0）
 #define SET_STOP do { \
@@ -25,15 +43,26 @@
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_AIN2_PIN); \
 } while (0)
 
+#if MOTOR2_FORWARD_REVERSED
+#define SET2_FWD  do { \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
+} while (0)
+
+#define SET2_REV  do { \
+    DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
+    DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
+} while (0)
+#else
 #define SET2_FWD  do { \
     DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
 } while (0)
-
 #define SET2_REV  do { \
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
     DL_GPIO_setPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN2_PIN); \
 } while (0)
+#endif
 
 #define SET2_STOP do { \
     DL_GPIO_clearPins(GPIO_MOTOR_PORT, GPIO_MOTOR_BIN1_PIN); \
@@ -51,11 +80,12 @@
 #define PWM_MAX_PERIOD_COUNT  (PWM_PERIOD_COUNT - 30)
 #define PWM2_MAX_PERIOD_COUNT (PWM2_PERIOD_COUNT - 30)
 
-#define ENCODER_RESOLUTION         (500)       
-#define ENCODER_TOTAL_RESOLUTION   (ENCODER_RESOLUTION * 4) //四倍频
-#define REDUCTION_RATIO            (28)   //减速比
-#define SPEED_PID_PERIOD           (20)
-#define WheelR                     (3.25f)  //轮子半径
+
+#define ENCODER_RESOLUTION         ENCODER_BASE_RESOLUTION
+#define ENCODER_TOTAL_RESOLUTION   ENCODER_X4_RESOLUTION
+#define REDUCTION_RATIO            ENCODER_REDUCTION_RATIO
+#define SPEED_PID_PERIOD           ENCODER_SAMPLE_PERIOD_MS
+#define WheelR                     ENCODER_WHEEL_RADIUS_CM
 #define lunju                      (14)
 #define BASE                       (60)
 
@@ -78,6 +108,12 @@ typedef enum {
     MOTOR_REV,
 } motor_dir_t;
 
+typedef enum {
+    DRIVE_FAULT_NONE = 0,
+    DRIVE_FAULT_MOTOR1_FEEDBACK_REVERSED = (1U << 0),
+    DRIVE_FAULT_MOTOR2_FEEDBACK_REVERSED = (1U << 1)
+} drive_fault_t;
+
 
 extern volatile uint8_t min_circle;
 extern volatile uint8_t maix_circle;
@@ -90,7 +126,9 @@ extern volatile uint32_t g_trace_overrun_count;
 extern volatile uint32_t g_run_20ms;
 extern volatile float g_turn_target_yaw;
 extern volatile float g_turn_yaw_error;
-extern volatile float lost_stop_times;
+extern volatile drive_fault_t g_drive_fault;
+extern volatile uint32_t g_motor1_reverse_feedback_count;
+extern volatile uint32_t g_motor2_reverse_feedback_count;
 
 extern float Baseleft;
 extern float Baseright;

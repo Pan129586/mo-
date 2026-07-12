@@ -1,5 +1,8 @@
 #include "bsp_pid.h"
 
+#define SPEED_PID_ERROR_MAX      (100.0f)
+#define SPEED_PID_INTEGRAL_MAX   (800.0f)
+#define SPEED_PID_OUTPUT_MAX     (970.0f)
 
 _pid pid_speed, pid_speed2,low_pid_speed,low_pid_speed2;    
 _pid pid_direct;
@@ -37,8 +40,8 @@ void PID_param_init()
     pid_speed.err_last=0.0;
     pid_speed.integral=0.0;
   
-		pid_speed.Kp =1.8;
-		pid_speed.Ki = 1.2;
+		pid_speed.Kp =0.7;
+		pid_speed.Ki = 0.1;
 		pid_speed.Kd = 0.1;
 		
 			  
@@ -49,8 +52,8 @@ void PID_param_init()
     pid_speed2.err_last=0.0;
     pid_speed2.integral=0.0;
   
-		pid_speed2.Kp = 2.0;
-		pid_speed2.Ki = 1.2;
+		pid_speed2.Kp = 0.7;
+		pid_speed2.Ki = 0.1;
 		pid_speed2.Kd = 0.1;
 		
 		
@@ -168,26 +171,57 @@ float direct_pid_realize(_pid *pid, float actual_val)
 
 float speed_pid_realize(_pid *pid, float actual_val)
 {
+    float candidate_integral;
+    float candidate_output;
+    float derivative;
 
-    pid->err=pid->target_val-actual_val;
+    pid->err = pid->target_val - actual_val;
+    if (pid->err > SPEED_PID_ERROR_MAX)
+    {
+        pid->err = SPEED_PID_ERROR_MAX;
+    }
+    else if (pid->err < -SPEED_PID_ERROR_MAX)
+    {
+        pid->err = -SPEED_PID_ERROR_MAX;
+    }
 
-    // if((pid->err<1.0f ) && (pid->err>-1.0f)) 
-		// {
-    //   pid->err = 0.0f;
-		// }
-	
-		
-    pid->integral += pid->err;   
-  //积分抗饱和限幅
-	   	 if (pid->integral >= 800) {pid->integral =800;}
-      else if (pid->integral < -800)  {pid->integral = -800;}
+    derivative = pid->err - pid->err_last;
+    candidate_integral = pid->integral + pid->err;
+    if (candidate_integral > SPEED_PID_INTEGRAL_MAX)
+    {
+        candidate_integral = SPEED_PID_INTEGRAL_MAX;
+    }
+    else if (candidate_integral < -SPEED_PID_INTEGRAL_MAX)
+    {
+        candidate_integral = -SPEED_PID_INTEGRAL_MAX;
+    }
 
-    pid->actual_val = pid->Kp*pid->err
-		                  +pid->Ki*pid->integral
-		                   +pid->Kd*(pid->err-pid->err_last);
-  
-    pid->err_last=pid->err;
-    
+    candidate_output = pid->Kp * pid->err +
+        pid->Ki * candidate_integral + pid->Kd * derivative;
+
+    if (candidate_output > SPEED_PID_OUTPUT_MAX)
+    {
+        pid->actual_val = SPEED_PID_OUTPUT_MAX;
+        if (pid->err < 0.0f)
+        {
+            pid->integral = candidate_integral;
+        }
+    }
+    else if (candidate_output < -SPEED_PID_OUTPUT_MAX)
+    {
+        pid->actual_val = -SPEED_PID_OUTPUT_MAX;
+        if (pid->err > 0.0f)
+        {
+            pid->integral = candidate_integral;
+        }
+    }
+    else
+    {
+        pid->integral = candidate_integral;
+        pid->actual_val = candidate_output;
+    }
+
+    pid->err_last = pid->err;
     return pid->actual_val;
 }
 

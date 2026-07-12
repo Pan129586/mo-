@@ -96,13 +96,17 @@ void YY61P_state_show(void)
     // OLED_ShowString(0, 0,  (uint8_t *)"Yaw:", 16);
     // OLED_ShowNum(32, 0,jy_frame_53_count , 4, 16); 
 
+    sprintf(str_buf, "1: %ld", g_lMotorPulseSigma);
+    OLED_ShowString(0, 2, (uint8_t *)str_buf, 16);
 
+    sprintf(str_buf, "2: %ld", g_lMotor2PulseSigma);
+    OLED_ShowString(0, 4, (uint8_t *)str_buf, 16);
 
-    OLED_ShowString(0, 2, (uint8_t *)"T90:", 16);
-    OLED_ShowNum(32, 2, turn_90_count, 2, 16);
-    OLED_ShowString(0, 4, (uint8_t *)"   ", 16);
-    OLED_ShowNum(32, 4, jy_checksum_error_count, 2, 16);
-    OLED_ShowNum(32, 6, jy_header_55_count, 2, 16);
+    // OLED_ShowString(0, 2, (uint8_t *)"T90:", 16);
+    // OLED_ShowNum(32, 2, turn_90_count, 2, 16);
+    // OLED_ShowString(0, 4, (uint8_t *)"   ", 16);
+    // OLED_ShowNum(32, 4, jy_checksum_error_count, 2, 16);
+    // OLED_ShowNum(32, 6, jy_header_55_count, 2, 16);
 
 
 }
@@ -120,8 +124,3 @@ void meau_show(void)
     }
 
 }
-   
-
-
-
-
