@@ -18,8 +18,9 @@ uint8_t Black_Sensor_Count = 0;
 static uint8_t s_lastCornerFlag = 0;
 static uint8_t s_cornerLockTicks = 0;
 
+
 static const float sensor_weight[8] = {
-    0.0f, 0.0f, -10.0f, -5.0f, 5.0f, 10.0f, 0.0f, 0.0f
+    -60.0f, -40.0f, -25.0f, -15.0f, 15.0f, 25.0f, 40.0f, 60.0f
 };
 
 void select_channel(uint8_t channel)

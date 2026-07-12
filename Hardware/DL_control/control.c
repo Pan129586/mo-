@@ -5,8 +5,8 @@
 
 
 #define four_corner_count        (4U)    // 跑完一圈需要的直角数
-#define corner_base_speed     (40.0f)     // 遇到直角时的降速目标
-#define lost_base_speed     (40.0f)      // 脱线时的寻线速度
+#define corner_base_speed     (30.0f)     // 遇到直角时的降速目标
+// #define lost_base_speed     (50.0f)      // 脱线时的寻线速度
 #define line_base_speed     (40.0f)
 /* Yaw Turn Config */
 #ifndef TRACE_TURN_DIR
@@ -253,7 +253,7 @@ static void reset_trace_phase(void)
     set_pid_target(&pid_angle, g_turn_target_yaw);
 }
 
- void enter_reacquire(void)
+ void enter_reacquire(void)   //进行转弯的时候实现角度pid
 {
     g_tracePhase = TRACE_PHASE_REACQUIRE;
     s_reacquire_ok_ticks = 0U;
@@ -294,7 +294,9 @@ static void reset_trace_phase(void)
             }
             else
             {
-                enter_reacquire();
+                g_tracePhase = TRACE_PHASE_LINE; 
+                PID_reset(&pid_direct);
+                // enter_reacquire();
             }
         }
         return;
@@ -310,58 +312,59 @@ static void reset_trace_phase(void)
     apply_speed_targets(-turn_output, turn_output);
 }
 
- void reacquire_line_control(void)
-{
-    float steer;
+//  void reacquire_line_control(void)
+// {
+//     float steer;
 
-    if ((Black_Sensor_Count > 0U) && (Corner_Flag == 0U))
-    {
-        if (s_reacquire_ok_ticks < UINT8_MAX)
-        {
-            s_reacquire_ok_ticks++;
-        }
-    }
-    else
-    {
-        s_reacquire_ok_ticks = 0U;
-    }
+//     if ((Black_Sensor_Count > 0U) && (Corner_Flag == 0U))
+//     {
+//         if (s_reacquire_ok_ticks < UINT8_MAX)
+//         {
+//             s_reacquire_ok_ticks++;
+//         }
+//     }
+//     else
+//     {
+//         s_reacquire_ok_ticks = 0U;
+//     }
 
-    if (s_reacquire_ok_ticks >= TRACE_REACQUIRE_OK_TICKS)
-    {
-        g_tracePhase = TRACE_PHASE_LINE;
-        PID_reset(&pid_direct);
-        return;
-    }
-    steer = Gray_pd_control();
-    if (steer > TRACE_REACQUIRE_STEER_MAX)
-    {
-        steer = TRACE_REACQUIRE_STEER_MAX;
-    }
-    else if (steer < -TRACE_REACQUIRE_STEER_MAX)
-    {
-        steer = -TRACE_REACQUIRE_STEER_MAX;
-    }
-    apply_speed_targets(TRACE_REACQUIRE_SPEED - steer,
-                        TRACE_REACQUIRE_SPEED + steer);
-}
+//     if (s_reacquire_ok_ticks >= TRACE_REACQUIRE_OK_TICKS)
+//     {
+//         g_tracePhase = TRACE_PHASE_LINE;
+//         PID_reset(&pid_direct);
+//         return;
+//     }
+//     steer = Gray_pd_control();
+//     if (steer > TRACE_REACQUIRE_STEER_MAX)
+//     {
+//         steer = TRACE_REACQUIRE_STEER_MAX;
+//     }
+//     else if (steer < -TRACE_REACQUIRE_STEER_MAX)
+//     {
+//         steer = -TRACE_REACQUIRE_STEER_MAX;
+//     }
+//     apply_speed_targets(TRACE_REACQUIRE_SPEED - steer,
+//                         TRACE_REACQUIRE_SPEED + steer);
+// }
 
-static float select_speed(void)
-{
-    //如果处于脱线状态，切入极低速寻线模式
-    if (Lost_Line_Count > 0U) 
-    {
-        return lost_base_speed;
-    }
 
-    //如果遇到直角特征，或者当前车身偏离黑线很远
-    if ((Corner_Flag != 0U) || (fabsf(Line_Num) > 22.0f)) 
-    {
-        return corner_base_speed;
-    }
+// static float select_speed(void)
+// {
+//     //如果处于脱线状态，切入极低速寻线模式
+//     if (Lost_Line_Count > 0U) 
+//     {
+//         return lost_base_speed;
+//     }
 
-    // 正常直线行驶
-    return line_base_speed;  //（60）
-}
+//     //如果遇到直角特征，或者当前车身偏离黑线很远
+//     if ((Corner_Flag != 0U) || (fabsf(Line_Num) > 22.0f)) 
+//     {
+//         return corner_base_speed;
+//     }
+
+//     // 正常直线行驶
+//     return line_base_speed;  //（60）
+// }
 
 
 void run_data_init(void)
@@ -406,6 +409,8 @@ void run_stop(trace_state_t next_state)
 
 void Trace_Task20ms(void)
 {
+    
+    JY61P_Poll();
     GetMotorPulse();
 
     if (g_traceState != RUN_STATE_RUNNING) 
@@ -418,27 +423,31 @@ void Trace_Task20ms(void)
 
     g_run_20ms++;
 
-    if (g_tracePhase == TRACE_PHASE_YAW_TURN)
-    {
-        yaw_turn_control();
-        return;
-    }
-    if (g_tracePhase == TRACE_PHASE_REACQUIRE)
-    {
-        reacquire_line_control();
-        return;
-    }
-    if (Corner_Rise_Flag == 1)   //检测到直角
-    {
-        enter_yaw_turn();
-        yaw_turn_control();
-        return;
-    }
-    float base_speed = select_speed();   //获取不同情况的速度
-    set_basespeed(base_speed, base_speed);
+    // if (g_tracePhase == TRACE_PHASE_YAW_TURN)
+    // {
+    //     yaw_turn_control();
+    //     return;
+    // }
+    // //这是在干嘛
+    // if (g_tracePhase == TRACE_PHASE_REACQUIRE)
+    // {
+    //     reacquire_line_control();
+    //     return;
+    // }
 
-    // direct_val = Gray_pd_control();   //
-    direct_val = 0;
+
+    // if (Corner_Rise_Flag == 1)   //检测到直角
+    // {
+    //     enter_yaw_turn();
+    //     yaw_turn_control();
+    //     return;
+    // }
+
+    // float base_speed = select_speed();   //获取不同情况的速度
+    set_basespeed(line_base_speed, line_base_speed);
+
+    direct_val = Gray_pd_control();   //
+    // direct_val = 0;
 
     speed_target = Baseleft - direct_val;
     speed2_target = Baseright + direct_val;
@@ -465,34 +474,15 @@ const char *get_runstate(void)
     }
 }
 
-char get_trace_phase_char(void)
-{
-    switch (g_tracePhase)
-    {
-        case TRACE_PHASE_LINE:
-            return 'L';
-        case TRACE_PHASE_YAW_TURN:
-            return 'T';
-        case TRACE_PHASE_REACQUIRE:
-            return 'R';
-        default:
-            return '?';
-    }
-}
+
 
 void TIMER_TICK_INST_IRQHandler(void)
 {
     switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST)) 
     {
         case DL_TIMER_IIDX_ZERO:
-            if (time_20ms_flag != 0U)
-            {
-                g_trace_overrun_count++;
-            }
-            else
-            {
-                time_20ms_flag = 1U;
-            }
+            time_20ms_flag = 1U;
+            Trace_Task20ms();
             break;
         default:
             break;
@@ -514,7 +504,7 @@ float Gray_pd_control(void)
 float speed_pid_control(void)
 {
     // return speed_pid_realize(&pid_speed, (float)g_nMotorPulse);
-      return speed_pid_realize(&pid_speed2, g_fMotorSpeedCmps);   //cm/s的单位
+      return speed_pid_realize(&pid_speed, g_fMotorSpeedCmps);   //cm/s的单位
  }
 
 float speed2_pid_control(void)
