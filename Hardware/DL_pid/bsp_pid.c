@@ -19,7 +19,7 @@ void PID_param_init()
     pid_angle.err_last = 0.0;
     pid_angle.integral = 0.0;
     pid_angle.Kp = 1.2;
-    pid_angle.Ki = 0.05;
+    pid_angle.Ki = 0.0;
     pid_angle.Kd = 0.24;
 
 
@@ -30,7 +30,7 @@ void PID_param_init()
     pid_direct.integral=0.0;
 
 		pid_direct.Kp = 4.0;
-		pid_direct.Ki = 0.25;
+		pid_direct.Ki = 0.0;
 		pid_direct.Kd = 0.24;
 	
   
@@ -153,8 +153,6 @@ float direct_pid_realize(_pid *pid, float actual_val)
   //     pid->integral = 0;
   //   }
     
-    pid->integral += pid->err;    
-
     pid->actual_val = pid->Kp*pid->err
 		                  
 		                  +pid->Kd*(pid->err-pid->err_last);

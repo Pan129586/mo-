@@ -111,20 +111,13 @@ typedef enum {
 
 typedef enum {
   TRACE_PHASE_LINE = 0,
-  TRACE_PHASE_YAW_TURN,
-  TRACE_PHASE_REACQUIRE
+  TRACE_PHASE_YAW_TURN
 } trace_phase_t;
 
 typedef enum {
   MOTOR_FWD = 0,
   MOTOR_REV,
 } motor_dir_t;
-
-typedef enum {
-  DRIVE_FAULT_NONE = 0,
-  DRIVE_FAULT_MOTOR1_FEEDBACK_REVERSED = (1U << 0),
-  DRIVE_FAULT_MOTOR2_FEEDBACK_REVERSED = (1U << 1)
-} drive_fault_t;
 
 extern volatile uint8_t min_circle;
 extern volatile uint8_t maix_circle;
@@ -137,9 +130,6 @@ extern volatile uint32_t g_trace_overrun_count;
 extern volatile uint32_t g_run_20ms;
 extern volatile float g_turn_target_yaw;
 extern volatile float g_turn_yaw_error;
-extern volatile drive_fault_t g_drive_fault;
-extern volatile uint32_t g_motor1_reverse_feedback_count;
-extern volatile uint32_t g_motor2_reverse_feedback_count;
 
 extern float Baseleft;
 extern float Baseright;
@@ -171,6 +161,5 @@ void Send_To_VOFA(float target_left, float real_left, float target_right,
 
 void enter_yaw_turn(void);
 void yaw_turn_control(void);
-void reacquire_line_control(void);
 
 #endif
