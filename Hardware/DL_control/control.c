@@ -1,10 +1,12 @@
 #include "control.h"
 
 #include "Hardware/DL_KEY/bsp_key.h"
+#include <math.h>
 
 #define JY61P_ISR_BYTE_BUDGET    (32U)
 #define FOUR_CORNER_COUNT        (4U)
-#define LINE_BASE_SPEED          (40.0f)
+#define LINE_BASE_SPEED          (30.0f)
+#define BASE_turn_angle             (90.0f) 
 
  
 float Baseleft = 0.0f;
@@ -25,6 +27,8 @@ uint8_t is_motor2_en = 0;
 
 volatile uint8_t min_circle = 1;  //定义圈数
 volatile uint8_t maix_circle =5;
+uint8_t turn_flag=0;
+float_t turn_target_yaw=0.0f;
 
 volatile trace_state_t g_traceState = RUN_STATE_READY;
 volatile uint8_t g_target_circle = 1;
@@ -55,19 +59,7 @@ static void rest_pid(void)
     MotorOutput(0, 0);
 }
 
- void apply_speed_targets(float left_target, float right_target)
-{
-    speed_target = left_target;
-    speed2_target = right_target;
 
-    set_pid_target(&pid_speed, speed_target);
-    set_pid_target(&pid_speed2, speed2_target);
-
-    MotorPWM = speed_pid_control();
-    Motor2PWM = speed2_pid_control();
-
-    MotorOutput((int)MotorPWM, (int)Motor2PWM);
-}
 
 void run_data_init(void)
 {
@@ -76,6 +68,8 @@ void run_data_init(void)
     g_compt_corner = 0;
     g_run_20ms = 0;
     Start_Flag = 0;
+    turn_flag =0;
+    turn_target_yaw = total_yaw;
     Graysensor_ResetState();
     set_basespeed(0.0f, 0.0f);
     rest_pid();
@@ -88,7 +82,8 @@ void run_start(void)
     g_run_20ms = 0;
     g_lMotorPulseSigma = 0;
     g_lMotor2PulseSigma = 0;
-
+    turn_flag =0;
+    turn_target_yaw = total_yaw;
     Graysensor_ResetState();
     reset_turn_count();
     rest_pid();
@@ -97,19 +92,79 @@ void run_start(void)
     g_traceState = RUN_STATE_RUNNING;    
 }
 
+void turn_start()
+{
+    turn_flag =1;
+    turn_target_yaw =total_yaw + 90.0f;
+
+    PID_reset(&pid_angle);
+    PID_reset(&pid_speed);
+    PID_reset(&pid_speed2);
+    set_pid_target(&pid_angle, turn_target_yaw);
+}
+
+void yaw_turn_control(void)
+{
+    float yaw_error;
+    float turn_speed;
+
+     yaw_error = turn_target_yaw - total_yaw;
+
+    if (fabsf(yaw_error) <=BASE_turn_angle )
+    {
+        MotorOutput(0, 0);
+        turn_flag = 0;
+
+        PID_reset(&pid_angle);
+        PID_reset(&pid_direct);
+        PID_reset(&pid_speed);
+        PID_reset(&pid_speed2);
+
+        g_compt_corner++;
+
+        if (g_compt_corner >= totall_corners())
+        {
+            run_stop(RUN_STATE_FINISHED);
+        }
+
+        return;
+    }
+
+    turn_speed = yaw_pid_realize(&pid_angle, total_yaw);
+     speed_target  =  -turn_speed;
+     speed2_target = turn_speed;
+
+     set_pid_target(&pid_speed, speed_target);
+    set_pid_target(&pid_speed2, speed2_target);
+
+    MotorPWM = speed_pid_control();
+    Motor2PWM = speed2_pid_control();
+
+    MotorOutput(MotorPWM, Motor2PWM);
+
+    if (g_compt_corner >= totall_corners())
+    {
+        run_stop(RUN_STATE_FINISHED);
+    }
+
+}
+
+
 void run_stop(trace_state_t next_state)
 {
+    turn_flag =0;
+    turn_target_yaw = total_yaw;
     g_traceState = next_state;
     Start_Flag = 0;
-    set_basespeed(0.0f, 0.0f);    //基础速度？还是设置目标速度
+    set_basespeed(0.0f, 0.0f);    
     rest_pid();
 }
 
 void Trace_Task20ms(void)
 {
-    (void)JY61P_PollBudget(JY61P_ISR_BYTE_BUDGET);
+     Light_Turn_control();
+     (void)JY61P_PollBudget(JY61P_ISR_BYTE_BUDGET);
     GetMotorPulse();
-    Light_Turn_control();
 
     if (g_traceState != RUN_STATE_RUNNING) 
     {
@@ -119,24 +174,32 @@ void Trace_Task20ms(void)
 
     g_run_20ms++;
 
-    if (Corner_Rise_Flag != 0U)
+    if(turn_flag == 1)
     {
-        if (g_compt_corner < UINT8_MAX)
-        {
-            g_compt_corner++;
-        }
-        if (g_compt_corner >= totall_corners())
-        {
-            run_stop(RUN_STATE_FINISHED);
-            return;
-        }
+        yaw_turn_control();
+        return;
+    }
+
+    if(Corner_Rise_Flag == 1)
+    {
+        turn_flag =1;
+        return;
     }
 
     direct_val = Gray_pd_control();
+    
     speed_target = Baseleft + direct_val;
     speed2_target = Baseright - direct_val;
 
-    apply_speed_targets(speed_target, speed2_target);
+    
+    set_pid_target(&pid_speed, speed_target);
+    set_pid_target(&pid_speed2, speed2_target);
+
+    MotorPWM = speed_pid_control();
+    Motor2PWM = speed2_pid_control();
+
+    MotorOutput(MotorPWM, Motor2PWM);
+    
 }
 
 const char *get_runstate(void)

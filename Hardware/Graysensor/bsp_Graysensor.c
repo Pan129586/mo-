@@ -11,6 +11,8 @@ uint16_t ADC_Value_Bat;
 
 volatile float Line_Num = 0.0f;
 float Last_Num = 0.0f;
+volatile uint8_t left_black=0;
+volatile uint8_t last_corner_flag=0;
 volatile uint8_t Corner_Flag = 0;
 volatile uint8_t Corner_Rise_Flag = 0;
 volatile uint8_t Black_Sensor_Count = 0;
@@ -21,18 +23,19 @@ static uint8_t s_corner_latched = 0U;
 
 
 static const float sensor_weight[8] = {
-    -35.0f, -20.0f, -15.0f, -5.0f, 5.0f, 15.0f, 20.0f, 35.0f
+       -30.0f, -22.0f, -16.0f, -10.0f,10.0f,  16.0f,  22.0f,  30.0f
 };
 
 void Graysensor_ResetState(void)
 {
     Line_Num = 0.0f;
     Last_Num = 0.0f;
-    Corner_Flag = 0U;
-    Corner_Rise_Flag = 0U;
-    Black_Sensor_Count = 0U;
-    g_corner_event_count = 0U;
-    s_corner_latched = 0U;
+    Corner_Flag = 0;
+    Corner_Rise_Flag = 0;
+    Black_Sensor_Count = 0;
+    g_corner_event_count = 0;
+    left_black =0;
+    last_corner_flag =0;
 }
 
 void select_channel(uint8_t channel)
@@ -118,7 +121,6 @@ void Light_Turn_control(void)
     float sum_weight = 0.0f;
     uint8_t sum_black = 0;
     uint8_t raw_corner;
-    uint8_t center_black;
 
     Graysensor_Read_All();
 
@@ -139,11 +141,23 @@ void Light_Turn_control(void)
     Black_Sensor_Count = sum_black;
     Corner_Rise_Flag = 0;
 
-    center_black = ((State_Value[3] != 0U) ||
-                    (State_Value[4] != 0U)) ? 1U : 0U;
-    raw_corner = ((State_Value[0] != 0U) &&
-                  (State_Value[1] != 0U)) ? 1U : 0U;
-    Corner_Flag = raw_corner;
+    left_black = State_Value[0] +State_Value[1] +State_Value[2] +State_Value[3];
+   if(left_black >=3)
+   {
+        Corner_Flag =1;
+   }
+   else 
+   {
+        Corner_Flag =0;
+   }
+
+    if(Corner_Flag ==1&&last_corner_flag==0)
+    {
+        Corner_Rise_Flag =1;
+        g_corner_event_count ++;
+    }
+
+    last_corner_flag = Corner_Flag; //更新
 
     if (sum_black == 0U)
     {
@@ -155,14 +169,5 @@ void Light_Turn_control(void)
         Last_Num = Line_Num;
     }
 
-    if ((raw_corner != 0U) && (s_corner_latched == 0U))
-    {
-        Corner_Rise_Flag = 1U;
-        g_corner_event_count++;
-        s_corner_latched = 1U;
-    }
-    else if ((raw_corner == 0U) && (center_black != 0U))
-    {
-        s_corner_latched = 0U;
-    }
+    
 }

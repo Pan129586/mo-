@@ -18,9 +18,9 @@ void PID_param_init()
     pid_angle.err = 0.0;
     pid_angle.err_last = 0.0;
     pid_angle.integral = 0.0;
-    pid_angle.Kp = 1.2;
+    pid_angle.Kp =0.4;
     pid_angle.Ki = 0.0;
-    pid_angle.Kd = 0.01;
+    pid_angle.Kd = 0.05;
 
 
     pid_direct.target_val=0.0;				
@@ -29,9 +29,9 @@ void PID_param_init()
     pid_direct.err_last=0.0;
     pid_direct.integral=0.0;
 
-		pid_direct.Kp = 0.6;
+		pid_direct.Kp = 0.8;
 		pid_direct.Ki = 0.0;
-		pid_direct.Kd = 0.01;
+		pid_direct.Kd = 0.05;
 	
   
     pid_speed.target_val=0.0;				
@@ -40,8 +40,8 @@ void PID_param_init()
     pid_speed.err_last=0.0;
     pid_speed.integral=0.0;
   
-		pid_speed.Kp =0.6;
-		pid_speed.Ki = 0.5;
+		pid_speed.Kp =1.5;
+		pid_speed.Ki = 0.2;
 		pid_speed.Kd = 0.1;
 		
 			  
@@ -52,8 +52,8 @@ void PID_param_init()
     pid_speed2.err_last=0.0;
     pid_speed2.integral=0.0;
   
-		pid_speed2.Kp =0.6;
-		pid_speed2.Ki = 0.5;
+		pid_speed2.Kp =1.5;
+		pid_speed2.Ki = 0.2;
 		pid_speed2.Kd = 0.1;
 		
 		
