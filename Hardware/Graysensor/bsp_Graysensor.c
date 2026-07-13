@@ -1,7 +1,7 @@
 #include "bsp_Graysensor.h"
 
 
-uint8_t State_Value[8];
+volatile uint8_t State_Value[8];
 volatile uint16_t sensor_values[8];
 volatile uint32_t g_gray_scan_count = 0U;
 volatile uint32_t g_gray_adc_timeout_count = 0U;
@@ -9,19 +9,19 @@ volatile uint32_t g_corner_event_count = 0U;
 uint16_t ADC_Value_Gray;
 uint16_t ADC_Value_Bat;
 
-float Line_Num = 0.0f;
+volatile float Line_Num = 0.0f;
 float Last_Num = 0.0f;
-uint8_t Corner_Flag = 0;
-uint8_t Corner_Rise_Flag = 0;
-uint8_t Black_Sensor_Count = 0;
+volatile uint8_t Corner_Flag = 0;
+volatile uint8_t Corner_Rise_Flag = 0;
+volatile uint8_t Black_Sensor_Count = 0;
 
 #define ADC_WAIT_TIMEOUT_COUNT 10000U
 
-static uint8_t s_lastCornerFlag = 0;
+static uint8_t s_corner_latched = 0U;
 
 
 static const float sensor_weight[8] = {
-    -60.0f, -50.0f, -35.0f, -20.0f, 20.0f, 35.0f, 50.0f, 60.0f
+    -35.0f, -20.0f, -15.0f, -5.0f, 5.0f, 15.0f, 20.0f, 35.0f
 };
 
 void Graysensor_ResetState(void)
@@ -31,7 +31,8 @@ void Graysensor_ResetState(void)
     Corner_Flag = 0U;
     Corner_Rise_Flag = 0U;
     Black_Sensor_Count = 0U;
-    s_lastCornerFlag = 0U;
+    g_corner_event_count = 0U;
+    s_corner_latched = 0U;
 }
 
 void select_channel(uint8_t channel)
@@ -99,8 +100,8 @@ void Graysensor_Read_All(void)
         }
 
         //要是后期有影响的话就删掉
-        if (wait_count >= ADC_WAIT_TIMEOUT_COUNT) { 
-            continue;
+        if (wait_count >= ADC_WAIT_TIMEOUT_COUNT) {
+            break;
         }
 
         sensor_values[i] = DL_ADC12_getMemResult(ADC12_sensor_INST, DL_ADC12_MEM_IDX_0);
@@ -117,6 +118,7 @@ void Light_Turn_control(void)
     float sum_weight = 0.0f;
     uint8_t sum_black = 0;
     uint8_t raw_corner;
+    uint8_t center_black;
 
     Graysensor_Read_All();
 
@@ -137,43 +139,30 @@ void Light_Turn_control(void)
     Black_Sensor_Count = sum_black;
     Corner_Rise_Flag = 0;
 
-    if (sum_black == 0U) 
+    center_black = ((State_Value[3] != 0U) ||
+                    (State_Value[4] != 0U)) ? 1U : 0U;
+    raw_corner = ((State_Value[0] != 0U) &&
+                  (State_Value[1] != 0U)) ? 1U : 0U;
+    Corner_Flag = raw_corner;
+
+    if (sum_black == 0U)
     {
         Line_Num = Last_Num;
-        Corner_Flag = 0;
-    } 
-    else 
+    }
+    else
     {
-        if(sum_black>= 3U)
-        {
-            raw_corner = 1U;
-        }
-        else
-        {
-            raw_corner=0U;
-        }
-
-        Corner_Flag = raw_corner;
-
-        if (raw_corner != 0U) 
-        {
-            Line_Num = Last_Num;
-        } 
-        else 
-        {
-            Line_Num = sum_weight / (float)sum_black;
-            Last_Num = Line_Num;
-        }
-        if ((raw_corner != 0U) && (s_lastCornerFlag == 0U))
-        {
-            Corner_Rise_Flag = 1;
-            g_corner_event_count++;
-        }
-        s_lastCornerFlag = raw_corner;
+        Line_Num = sum_weight / (float)sum_black;
+        Last_Num = Line_Num;
     }
 
-    if (Corner_Flag == 0) 
+    if ((raw_corner != 0U) && (s_corner_latched == 0U))
     {
-        s_lastCornerFlag = 0;
+        Corner_Rise_Flag = 1U;
+        g_corner_event_count++;
+        s_corner_latched = 1U;
+    }
+    else if ((raw_corner == 0U) && (center_black != 0U))
+    {
+        s_corner_latched = 0U;
     }
 }

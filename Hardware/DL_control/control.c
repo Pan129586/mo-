@@ -1,20 +1,10 @@
 #include "control.h"
 
 #include "Hardware/DL_KEY/bsp_key.h"
-#include <math.h>
 
-
-#define four_corner_count        (4U)    // 跑完一圈需要的直角数
-#define line_base_speed          (60.0f)
-
-
-
-#ifndef TRACE_TURN_DIR
-#define TRACE_TURN_DIR             (1.0f)
-#endif
-#define TRACE_TURN_ANGLE_DEG       (90.0f)
-#define TRACE_TURN_TOLERANCE_DEG   (6.0f)
-#define TRACE_TURN_SETTLE_TICKS    (3U)
+#define JY61P_ISR_BYTE_BUDGET    (32U)
+#define FOUR_CORNER_COUNT        (4U)
+#define LINE_BASE_SPEED          (40.0f)
 
  
 float Baseleft = 0.0f;
@@ -37,16 +27,12 @@ volatile uint8_t min_circle = 1;  //定义圈数
 volatile uint8_t maix_circle =5;
 
 volatile trace_state_t g_traceState = RUN_STATE_READY;
-volatile trace_phase_t g_tracePhase = TRACE_PHASE_LINE;
 volatile uint8_t g_target_circle = 1;
 volatile uint8_t g_compt_corner = 0;
 volatile uint32_t g_run_20ms = 0;
-volatile float g_turn_target_yaw = 0.0f;
-volatile float g_turn_yaw_error = 0.0f;
+volatile uint32_t g_trace_isr_count = 0U;
 
-volatile uint32_t  time_20ms_flag=0;
 volatile uint32_t g_trace_overrun_count = 0U;
-static uint8_t s_turn_settle_ticks = 0U;
 
 static float vofa_data[5];
 static uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7F};
@@ -55,7 +41,7 @@ static uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7F};
 //计算当前设定的圈数一共需要跑多少个直角
 static uint8_t totall_corners(void)
 {
-    return (uint8_t)(g_target_circle * four_corner_count);
+    return (uint8_t)(g_target_circle * FOUR_CORNER_COUNT);
 }
 
 static void rest_pid(void)
@@ -67,18 +53,6 @@ static void rest_pid(void)
     PID_reset(&pid_direct);
     PID_reset(&pid_angle);
     MotorOutput(0, 0);
-}
-
-
-static void reset_trace_phase(void)
-{
-    g_tracePhase = TRACE_PHASE_LINE;
-    g_turn_target_yaw = total_yaw;
-    g_turn_yaw_error = 0.0f;
-    s_turn_settle_ticks = 0U;
-
-    set_pid_target(&pid_angle, total_yaw);
-    PID_reset(&pid_angle);
 }
 
  void apply_speed_targets(float left_target, float right_target)
@@ -95,67 +69,6 @@ static void reset_trace_phase(void)
     MotorOutput((int)MotorPWM, (int)Motor2PWM);
 }
 
- void enter_yaw_turn(void)
-{
-    g_tracePhase = TRACE_PHASE_YAW_TURN;
-
-    g_turn_target_yaw = total_yaw + (TRACE_TURN_DIR * TRACE_TURN_ANGLE_DEG);
-    g_turn_yaw_error = g_turn_target_yaw - total_yaw;
-    s_turn_settle_ticks = 0U;
-    PID_reset(&pid_angle);
-    PID_reset(&pid_speed);
-    PID_reset(&pid_speed2);
-    PID_reset(&pid_direct);
-    set_pid_target(&pid_angle, g_turn_target_yaw);
-}
-
- void yaw_turn_control(void)
-{
-    float turn_output;
-
-    g_turn_yaw_error = g_turn_target_yaw - total_yaw;
-    if (fabsf(g_turn_yaw_error) <= TRACE_TURN_TOLERANCE_DEG)
-    {
-        if (s_turn_settle_ticks == 0U)
-        {
-            PID_reset(&pid_speed);
-            PID_reset(&pid_speed2);
-        }
-        if (s_turn_settle_ticks < UINT8_MAX)
-        {
-            s_turn_settle_ticks++;
-        }
-        MotorOutput(0, 0);
-
-        if (s_turn_settle_ticks >= TRACE_TURN_SETTLE_TICKS)
-        {
-            if (g_compt_corner < UINT8_MAX)
-            {
-                g_compt_corner++;
-            }
-            if (g_compt_corner >= totall_corners())
-            {
-                run_stop(RUN_STATE_FINISHED);
-            }
-            else
-            {
-                g_tracePhase = TRACE_PHASE_LINE; 
-                PID_reset(&pid_direct);
-            }
-        }
-        return;
-    }
-
-    if (s_turn_settle_ticks != 0U)
-    {
-        s_turn_settle_ticks = 0U;
-        PID_reset(&pid_speed);
-        PID_reset(&pid_speed2);
-    }
-    turn_output = yaw_pid_realize(&pid_angle, total_yaw);
-    apply_speed_targets(-turn_output, turn_output);
-}
-
 void run_data_init(void)
 {
     g_traceState = RUN_STATE_READY;
@@ -164,7 +77,6 @@ void run_data_init(void)
     g_run_20ms = 0;
     Start_Flag = 0;
     Graysensor_ResetState();
-    reset_trace_phase();
     set_basespeed(0.0f, 0.0f);
     rest_pid();
 }
@@ -179,31 +91,25 @@ void run_start(void)
 
     Graysensor_ResetState();
     reset_turn_count();
-    reset_trace_phase();
     rest_pid();
-    set_basespeed(line_base_speed, line_base_speed);
+    set_basespeed(LINE_BASE_SPEED, LINE_BASE_SPEED);
     Start_Flag = 1; 
     g_traceState = RUN_STATE_RUNNING;    
 }
 
 void run_stop(trace_state_t next_state)
 {
+    g_traceState = next_state;
     Start_Flag = 0;
     set_basespeed(0.0f, 0.0f);    //基础速度？还是设置目标速度
     rest_pid();
-    reset_trace_phase();
-    g_traceState = next_state;
 }
 
 void Trace_Task20ms(void)
 {
+    (void)JY61P_PollBudget(JY61P_ISR_BYTE_BUDGET);
     GetMotorPulse();
-
-    /* Keep ADC values live while waiting to start. Yaw turns do not need gray data. */
-    if (g_tracePhase == TRACE_PHASE_LINE)
-    {
-        Light_Turn_control();
-    }
+    Light_Turn_control();
 
     if (g_traceState != RUN_STATE_RUNNING) 
     {
@@ -213,25 +119,22 @@ void Trace_Task20ms(void)
 
     g_run_20ms++;
 
-    if (g_tracePhase == TRACE_PHASE_YAW_TURN)
-    {
-        yaw_turn_control();
-        return;
-    }
-
     if (Corner_Rise_Flag != 0U)
     {
-        enter_yaw_turn();
-        yaw_turn_control();
-        return;
+        if (g_compt_corner < UINT8_MAX)
+        {
+            g_compt_corner++;
+        }
+        if (g_compt_corner >= totall_corners())
+        {
+            run_stop(RUN_STATE_FINISHED);
+            return;
+        }
     }
 
-    set_basespeed(line_base_speed, line_base_speed);
-
     direct_val = Gray_pd_control();
-
-    speed_target = Baseleft - direct_val;
-    speed2_target = Baseright + direct_val;
+    speed_target = Baseleft + direct_val;
+    speed2_target = Baseright - direct_val;
 
     apply_speed_targets(speed_target, speed2_target);
 }
@@ -262,13 +165,13 @@ void TIMER_TICK_INST_IRQHandler(void)
     switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST)) 
     {
         case DL_TIMER_IIDX_ZERO:
-            if (time_20ms_flag != 0U)
+            g_trace_isr_count++;
+            Trace_Task20ms();
+            if ((DL_TimerG_getRawInterruptStatus(
+                     TIMER_TICK_INST, DL_TIMERG_INTERRUPT_ZERO_EVENT) &
+                 DL_TIMERG_INTERRUPT_ZERO_EVENT) != 0U)
             {
                 g_trace_overrun_count++;
-            }
-            else
-            {
-                time_20ms_flag = 1U;
             }
             break;
         default:

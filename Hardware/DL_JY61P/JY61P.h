@@ -28,9 +28,12 @@ extern volatile uint32_t jy_header_55_count;
 extern volatile uint32_t jy_frame_51_count;
 extern volatile uint32_t jy_frame_52_count;
 extern volatile uint32_t jy_invalid_type_count;
+extern volatile uint32_t jy_poll_budget_hit_count;
+extern volatile uint32_t jy_poll_processed_count;
 
 
 void JY61P_Poll(void);
+uint16_t JY61P_PollBudget(uint16_t max_bytes);
 void JY61P_DMA_Init(void);
 void JY61P_UpdateTurnCounter(void);
 void reset_turn_count(void);

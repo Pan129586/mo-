@@ -12,7 +12,7 @@ _pid pid_angle;
 
 void PID_param_init()
 {
-    // Angle PID
+
     pid_angle.target_val = 0.0;
     pid_angle.actual_val = 0.0;
     pid_angle.err = 0.0;
@@ -20,7 +20,7 @@ void PID_param_init()
     pid_angle.integral = 0.0;
     pid_angle.Kp = 1.2;
     pid_angle.Ki = 0.0;
-    pid_angle.Kd = 0.24;
+    pid_angle.Kd = 0.01;
 
 
     pid_direct.target_val=0.0;				
@@ -29,9 +29,9 @@ void PID_param_init()
     pid_direct.err_last=0.0;
     pid_direct.integral=0.0;
 
-		pid_direct.Kp = 4.0;
+		pid_direct.Kp = 0.6;
 		pid_direct.Ki = 0.0;
-		pid_direct.Kd = 0.24;
+		pid_direct.Kd = 0.01;
 	
   
     pid_speed.target_val=0.0;				
@@ -40,7 +40,7 @@ void PID_param_init()
     pid_speed.err_last=0.0;
     pid_speed.integral=0.0;
   
-		pid_speed.Kp =1.8;
+		pid_speed.Kp =0.6;
 		pid_speed.Ki = 0.5;
 		pid_speed.Kd = 0.1;
 		
@@ -52,7 +52,7 @@ void PID_param_init()
     pid_speed2.err_last=0.0;
     pid_speed2.integral=0.0;
   
-		pid_speed2.Kp =1.8;
+		pid_speed2.Kp =0.6;
 		pid_speed2.Ki = 0.5;
 		pid_speed2.Kd = 0.1;
 		
@@ -184,7 +184,7 @@ float speed_pid_realize(_pid *pid, float actual_val)
     }
 
     derivative = pid->err - pid->err_last;
-    candidate_integral = pid->integral + pid->err;
+    candidate_integral = pid->integral + pid->err ;
     if (candidate_integral > SPEED_PID_INTEGRAL_MAX)
     {
         candidate_integral = SPEED_PID_INTEGRAL_MAX;

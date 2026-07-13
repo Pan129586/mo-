@@ -20,6 +20,8 @@ volatile uint32_t jy_header_55_count = 0;
 volatile uint32_t jy_frame_51_count = 0;
 volatile uint32_t jy_frame_52_count = 0;
 volatile uint32_t jy_invalid_type_count = 0;
+volatile uint32_t jy_poll_budget_hit_count = 0;
+volatile uint32_t jy_poll_processed_count = 0;
 
 uint8_t Start_Flag = 0;
 uint8_t uart2_rxbuff = 0;
@@ -182,16 +184,22 @@ static void JY61P_receiv(uint8_t ch)
 }
 
 //串口接收的环形数组
-void JY61P_Poll(void)
+uint16_t JY61P_PollBudget(uint16_t max_bytes)
 {
     uint16_t dma_remain = DL_DMA_getTransferSize(DMA, DMA_CH0_CHAN_ID);
     uint16_t current_head;
+    uint16_t processed = 0U;
+
+    if (max_bytes == 0U)
+    {
+        return 0U;
+    }
 
     jy_dma_remain_debug = dma_remain;
 
     if (dma_remain > JY_RX_BUF_SIZE) 
     {
-        return;
+        return 0U;
     }
 
     current_head = (uint16_t)((JY_RX_BUF_SIZE - dma_remain) % JY_RX_BUF_SIZE);
@@ -199,14 +207,28 @@ void JY61P_Poll(void)
 
     jy_dma_head_debug = current_head;
 
-    while (jy_rx_tail != current_head) 
+    while ((jy_rx_tail != current_head) && (processed < max_bytes))
     {
         uint8_t ch = jy_rx_buf[jy_rx_tail];
         jy_rx_tail = (uint16_t)((jy_rx_tail + 1U) % JY_RX_BUF_SIZE);
         jy_last_rx_byte = ch;
         uart_rx_test_count++;
         JY61P_receiv(ch);
+        processed++;
     }
+
+    jy_poll_processed_count += processed;
+    if (jy_rx_tail != current_head)
+    {
+        jy_poll_budget_hit_count++;
+    }
+
+    return processed;
+}
+
+void JY61P_Poll(void)
+{
+    (void)JY61P_PollBudget(JY_RX_BUF_SIZE);
 }
 
 void UART_JY61P_INST_IRQHandler(void)

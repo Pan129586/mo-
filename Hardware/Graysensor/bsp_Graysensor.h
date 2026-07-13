@@ -7,12 +7,12 @@
 
 #define THRESHOLD 2000
 
-extern uint8_t State_Value[8];
+extern volatile uint8_t State_Value[8];
 extern volatile uint16_t sensor_values[8];
-extern float Line_Num;
-extern uint8_t Corner_Flag;
-extern uint8_t Corner_Rise_Flag;
-extern uint8_t Black_Sensor_Count;
+extern volatile float Line_Num;
+extern volatile uint8_t Corner_Flag;
+extern volatile uint8_t Corner_Rise_Flag;
+extern volatile uint8_t Black_Sensor_Count;
 extern volatile uint32_t g_gray_scan_count;
 extern volatile uint32_t g_gray_adc_timeout_count;
 extern volatile uint32_t g_corner_event_count;

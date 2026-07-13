@@ -8,21 +8,6 @@
 
 uint32_t last_show_time = 0U;
 
-static uint8_t App_TakeTraceTick(void)
-{
-    uint32_t primask = __get_PRIMASK();
-    uint8_t pending;
-
-    __disable_irq();
-    pending = (time_20ms_flag != 0U) ? 1U : 0U;
-    time_20ms_flag = 0U;
-    if (primask == 0U)
-    {
-        __enable_irq();
-    }
-
-    return pending;
-}
 int main(void)
 {
     SYSCFG_DL_init();
@@ -42,12 +27,6 @@ int main(void)
 
     while (1)
     {
-        if (App_TakeTraceTick() != 0U)
-        {
-            Trace_Task20ms();
-        }
-
-        JY61P_Poll();
         key_press();
         if ((uint32_t)(ui_time - last_show_time) >= 100U)
         {

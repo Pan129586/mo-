@@ -3,7 +3,7 @@
 uint8_t meau_flag=1;
 char str_buf[16];
 char str_buf1[16];
-
+char str_buf2[16];
 
 
 void key_press(void)
@@ -19,7 +19,7 @@ void key_press(void)
     {
         case KEY1_PRES:
             meau_flag ++;
-            if(meau_flag>2)
+            if(meau_flag>3)
             {
                 meau_flag =1;
             }
@@ -69,20 +69,12 @@ void key_press(void)
 void run_state_show(void)
 {
    OLED_ShowString(0, 0, (uint8_t *)get_runstate(), 16);
-    // 第二行：显示圈数 (Y=2)
+
     OLED_ShowString(0, 2, (uint8_t *)"circle:", 16);
     OLED_ShowNum(56, 2, g_target_circle, 1, 16);
     OLED_ShowString(0, 4, (uint8_t *)"corner_get:", 16);
     OLED_ShowNum(88, 4, g_compt_corner, 2, 16);
 
-    // OLED_ShowString(0, 6, (uint8_t *)"B:", 16);
-    // OLED_ShowNum(16, 6, Black_Sensor_Count, 1, 16);
-    // OLED_ShowString(32, 6, (uint8_t *)"F:", 16);
-    // OLED_ShowNum(48, 6, Corner_Flag, 1, 16);
-    // OLED_ShowString(64, 6, (uint8_t *)"E:", 16);
-    // OLED_ShowNum(80, 6, g_corner_event_count, 2, 16);
-    // OLED_ShowString(104, 6, (uint8_t *)"P:", 16);
-    // OLED_ShowNum(120, 6, (uint8_t)g_tracePhase, 1, 16);
 
 }
 
@@ -90,6 +82,9 @@ void YY61P_state_show(void)
 {
     sprintf(str_buf, "Yaw: %.2f", yaw_real); 
     OLED_ShowString(0, 0, (uint8_t *)str_buf, 16);
+
+    sprintf(str_buf2, "Flag: %d", Corner_Flag);
+     OLED_ShowString(0, 2, (uint8_t *)str_buf2, 16);
 
     sprintf(str_buf1, "total_yaw: %.2f", total_yaw);
      OLED_ShowString(0, 6, (uint8_t *)str_buf1, 16);
@@ -119,6 +114,28 @@ void YY61P_state_show(void)
 }
 
 
+void debug_show()
+{
+    snprintf(str_buf, sizeof(str_buf), "I:%lu",
+             (unsigned long)g_trace_isr_count);
+    OLED_ShowString(0, 0, (uint8_t *)str_buf, 16);
+
+    snprintf(str_buf2, sizeof(str_buf2), "O:%lu",
+             (unsigned long)g_trace_overrun_count);
+    OLED_ShowString(0, 2, (uint8_t *)str_buf2, 16);
+
+    snprintf(str_buf1, sizeof(str_buf1), "B:%u F:%u",
+             (unsigned int)Black_Sensor_Count,
+             (unsigned int)Corner_Flag);
+    OLED_ShowString(0, 4, (uint8_t *)str_buf1, 16);
+
+    snprintf(str_buf1, sizeof(str_buf1), "E:%lu C:%u",
+             (unsigned long)g_corner_event_count,
+             (unsigned int)g_compt_corner);
+    OLED_ShowString(0, 6, (uint8_t *)str_buf1, 16);
+}
+
+
 void meau_show(void)
 {
     if(meau_flag==1)
@@ -128,6 +145,11 @@ void meau_show(void)
     else if (meau_flag==2) 
     {
         run_state_show();
+    }
+    else if (meau_flag ==3)
+    {
+        debug_show();
+
     }
 
 }
