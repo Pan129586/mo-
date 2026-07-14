@@ -74,7 +74,9 @@ void run_state_show(void)
     OLED_ShowNum(56, 2, g_target_circle, 1, 16);
     OLED_ShowString(0, 4, (uint8_t *)"corner_get:", 16);
     OLED_ShowNum(88, 4, g_compt_corner, 2, 16);
-    OLED_ShowNum(0, 6, Corner_Rise_Flag, 2, 16);
+
+    // sprintf(str_buf2, "Turn:%u", (unsigned int)Corner_Rise_Flag);
+    // OLED_ShowString(0, 6, (uint8_t *)str_buf2, 16);
 
 
 }
@@ -84,8 +86,11 @@ void YY61P_state_show(void)
     sprintf(str_buf, "Yaw: %.2f", yaw_real); 
     OLED_ShowString(0, 0, (uint8_t *)str_buf, 16);
 
-    sprintf(str_buf2, "Flag: %d", Corner_Rise_Flag);
-     OLED_ShowString(0, 2, (uint8_t *)str_buf2, 16);
+        sprintf(str_buf2, "Turn:%u", (unsigned int)Corner_Rise_Flag);
+        OLED_ShowString(0, 2, (uint8_t *)str_buf2, 16);
+
+    // sprintf(str_buf2, "Flag: %d", Corner_Rise_Flag);
+    //  OLED_ShowString(0, 2, (uint8_t *)str_buf2, 16);
 
     sprintf(str_buf1, "total_yaw: %.2f", total_yaw);
      OLED_ShowString(0, 6, (uint8_t *)str_buf1, 16);

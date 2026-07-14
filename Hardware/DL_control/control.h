@@ -122,7 +122,11 @@ extern volatile uint8_t g_compt_corner;
 extern volatile uint32_t g_trace_overrun_count;
 extern volatile uint32_t g_run_20ms;
 extern volatile uint32_t g_trace_isr_count;
+extern volatile uint8_t flag_20ms;
+extern volatile uint8_t turn_flag;
 
+
+extern volatile uint8_t LINE_BASE_SPEED;
 extern float Baseleft;
 extern float Baseright;
 extern uint8_t is_motor_en;
@@ -149,6 +153,7 @@ float speed_pid_control(void);
 float speed2_pid_control(void);
 void MotorOutput(int nMotorPwm, int nMotor2Pwm);
 void Send_To_VOFA(float target_left, float real_left, float target_right,
-                  float real_right, float line_num);
+                  float real_right);
+void turn_diff_control();
 
 #endif

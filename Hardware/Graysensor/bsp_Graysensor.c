@@ -16,6 +16,7 @@ volatile uint8_t last_corner_flag=0;
 volatile uint8_t Corner_Flag = 0;
 volatile uint8_t Corner_Rise_Flag = 0;
 volatile uint8_t Black_Sensor_Count = 0;
+volatile uint8_t center_found_flag = 0;
 
 #define ADC_WAIT_TIMEOUT_COUNT 10000U
 
@@ -154,6 +155,7 @@ void Light_Turn_control(void)
     if(Corner_Flag ==1&&last_corner_flag==0)
     {
         Corner_Rise_Flag =1;
+        
         g_corner_event_count ++;
     }
 

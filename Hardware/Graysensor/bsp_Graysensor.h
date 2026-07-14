@@ -18,6 +18,7 @@ extern volatile uint32_t g_gray_adc_timeout_count;
 extern volatile uint32_t g_corner_event_count;
 extern volatile uint8_t left_black;
 extern volatile uint8_t last_corner_flag;
+extern volatile uint8_t center_found_flag;
 
 void Graysensor_Read_All(void);
 void Graysensor_ResetState(void);

@@ -5,7 +5,7 @@
 
 #define JY61P_ISR_BYTE_BUDGET    (32U)
 #define FOUR_CORNER_COUNT        (4U)
-#define LINE_BASE_SPEED          (30.0f)
+// #define LINE_BASE_SPEED          (35.0f)
 #define BASE_turn_angle             (90.0f) 
 
  
@@ -27,8 +27,18 @@ uint8_t is_motor2_en = 0;
 
 volatile uint8_t min_circle = 1;  //定义圈数
 volatile uint8_t maix_circle =5;
-uint8_t turn_flag=0;
-float_t turn_target_yaw=0.0f;
+volatile uint8_t turn_flag=0;
+float turn_target_yaw=0.0f;
+float min_turn_angle = 45.0f;
+float turn_start_yaw = 0.0f;
+volatile uint8_t flag_20ms = 0;
+
+uint8_t turn_left_speed = 10;
+uint8_t turn_r_speed = 35;
+volatile uint8_t LINE_BASE_SPEED=35;
+
+uint8_t normal_line_flag = 0;
+
 
 volatile trace_state_t g_traceState = RUN_STATE_READY;
 volatile uint8_t g_target_circle = 1;
@@ -103,6 +113,9 @@ void turn_start()
     set_pid_target(&pid_angle, turn_target_yaw);
 }
 
+
+
+
 void yaw_turn_control(void)
 {
     float yaw_error;
@@ -160,6 +173,58 @@ void run_stop(trace_state_t next_state)
     rest_pid();
 }
 
+
+// void start_diff_turn()
+// {
+//     turn_flag = 1;
+//     turn_start_yaw = total_yaw;
+
+// }
+
+void turn_diff_control()
+{
+    float turned_yaw=0.0f;
+    turned_yaw = fabsf(total_yaw - turn_start_yaw);
+    if(State_Value[3]==1 || State_Value[4] == 1)
+    {
+        center_found_flag = 1;
+
+    }
+
+    if(Corner_Flag == 0 && Black_Sensor_Count >=1 && Black_Sensor_Count <=2 && center_found_flag ==1)
+    {
+        normal_line_flag =1;
+    }
+
+    if(turn_flag ==1&&turned_yaw >= min_turn_angle && normal_line_flag ==1)
+    {
+        turn_flag =0;
+         PID_reset(&pid_direct);
+
+          g_compt_corner++;
+
+          if (g_compt_corner >= totall_corners())
+          {
+                run_stop(RUN_STATE_FINISHED);
+          }
+
+         return;
+    }
+
+        speed_target  = turn_left_speed;
+      speed2_target = turn_r_speed;
+
+      set_pid_target(&pid_speed, speed_target);
+        set_pid_target(&pid_speed2, speed2_target);
+
+    MotorPWM  = speed_pid_control();
+    Motor2PWM = speed2_pid_control();
+
+    MotorOutput(MotorPWM, Motor2PWM);
+
+}
+
+
 void Trace_Task20ms(void)
 {
      Light_Turn_control();
@@ -171,23 +236,27 @@ void Trace_Task20ms(void)
         MotorOutput(0, 0);
         return;
     }
+    // if (turn_flag ==1 )
+    // {
+    //     turn_diff_control();
+    //     return;
+    // }
+    
+    // if(Corner_Rise_Flag ==1)
+    // {
+    //     turn_flag = 1;
+    //      turn_start_yaw = total_yaw;
+    //      center_found_flag = 0;
+    //     normal_line_flag = 0;
+    //      turn_diff_control();
+    //      return;
+    // }
 
     g_run_20ms++;
 
-    if(turn_flag == 1)
-    {
-        yaw_turn_control();
-        return;
-    }
-
-    if(Corner_Rise_Flag == 1)
-    {
-        turn_flag =1;
-        return;
-    }
-
-    direct_val = Gray_pd_control();
+    // direct_val = Gray_pd_control();
     
+    direct_val = 0;
     speed_target = Baseleft + direct_val;
     speed2_target = Baseright - direct_val;
 
@@ -228,8 +297,10 @@ void TIMER_TICK_INST_IRQHandler(void)
     switch (DL_TimerG_getPendingInterrupt(TIMER_TICK_INST)) 
     {
         case DL_TIMER_IIDX_ZERO:
+            flag_20ms = 1;
             g_trace_isr_count++;
             Trace_Task20ms();
+            // Send_To_VOFA(LINE_BASE_SPEED,g_fMotorSpeedCmps,LINE_BASE_SPEED,g_fMotor2SpeedCmps);
             if ((DL_TimerG_getRawInterruptStatus(
                      TIMER_TICK_INST, DL_TIMERG_INTERRUPT_ZERO_EVENT) &
                  DL_TIMERG_INTERRUPT_ZERO_EVENT) != 0U)
@@ -275,17 +346,19 @@ void UART_SendArray(uint8_t *data, uint16_t len)
 }
 
 void Send_To_VOFA(float target_left, float real_left, float target_right,
-                  float real_right, float line_num)
+                  float real_right)
 {
     vofa_data[0] = target_left;
     vofa_data[1] = real_left;
     vofa_data[2] = target_right;
     vofa_data[3] = real_right;
-    vofa_data[4] = line_num;
+    
 
     UART_SendArray((uint8_t *)vofa_data, sizeof(vofa_data));
     UART_SendArray(vofa_tail, 4);
 }
+
+
 
 void MotorOutput(int nMotorPwm, int nMotor2Pwm)
 {

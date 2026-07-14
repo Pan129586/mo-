@@ -82,7 +82,6 @@ GPIO1.associatedPins[3].assignedPin  = "24";
 GPIO2.$name                          = "GPIO_SENSOR";
 GPIO2.associatedPins.create(3);
 GPIO2.associatedPins[0].$name        = "AD0";
-GPIO2.associatedPins[0].invert       = "DISABLE";
 GPIO2.associatedPins[0].assignedPort = "PORTB";
 GPIO2.associatedPins[0].assignedPin  = "22";
 GPIO2.associatedPins[0].pin.$assign  = "PB22";
@@ -209,7 +208,6 @@ PWM2.ccIndex                            = [1];
 PWM2.timerStartTimer                    = true;
 PWM2.pwmMode                            = "EDGE_ALIGN_UP";
 PWM2.clockDivider                       = 4;
-PWM2.clockDivider                       = 4;
 PWM2.ccp1PinConfig.direction            = scripting.forceWrite("OUTPUT");
 PWM2.ccp1PinConfig.hideOutputInversion  = scripting.forceWrite(false);
 PWM2.ccp1PinConfig.onlyInternalResistor = scripting.forceWrite(false);
@@ -291,7 +289,9 @@ UART3.rxPinConfig.hideOutputInversion  = scripting.forceWrite(false);
 UART3.rxPinConfig.onlyInternalResistor = scripting.forceWrite(false);
 UART3.rxPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
 
-UART4.$name                            = "UART_0";
+UART4.$name                            = "UART_32";
+UART4.targetBaudRate                   = 115200;
+UART4.enabledDMATXTriggers             = "DL_UART_DMA_INTERRUPT_TX";
 UART4.peripheral.$assign               = "UART2";
 UART4.peripheral.rxPin.$assign         = "PA22";
 UART4.peripheral.txPin.$assign         = "PA21";
@@ -304,6 +304,10 @@ UART4.rxPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric12";
 UART4.rxPinConfig.hideOutputInversion  = scripting.forceWrite(false);
 UART4.rxPinConfig.onlyInternalResistor = scripting.forceWrite(false);
 UART4.rxPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+UART4.DMA_CHANNEL_TX.$name             = "DMA_CH1";
+UART4.DMA_CHANNEL_TX.addressMode       = "b2f";
+UART4.DMA_CHANNEL_TX.dstLength         = "BYTE";
+UART4.DMA_CHANNEL_TX.srcLength         = "BYTE";
 
 /**
  * Pinmux solution for unlocked pins/peripherals. This ensures that minor changes to the automatic solver in a future
@@ -330,5 +334,6 @@ GPIO7.associatedPins[1].pin.$suggestSolution     = "PB20";
 GPIO8.associatedPins[0].pin.$suggestSolution     = "PB21";
 PWM2.peripheral.$suggestSolution                 = "TIMA1";
 PWM2.peripheral.ccp1Pin.$suggestSolution         = "PB1";
-UART1.DMA_CHANNEL_RX.peripheral.$suggestSolution = "DMA_CH0";
+UART1.DMA_CHANNEL_RX.peripheral.$suggestSolution = "DMA_CH1";
 UART3.peripheral.$suggestSolution                = "UART3";
+UART4.DMA_CHANNEL_TX.peripheral.$suggestSolution = "DMA_CH0";
