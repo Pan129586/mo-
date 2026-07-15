@@ -17,6 +17,7 @@ volatile uint8_t Corner_Flag = 0;
 volatile uint8_t Corner_Rise_Flag = 0;
 volatile uint8_t Black_Sensor_Count = 0;
 volatile uint8_t center_found_flag = 0;
+uint8_t corner_count=0;
 
 #define ADC_WAIT_TIMEOUT_COUNT 10000U
 
@@ -37,6 +38,8 @@ void Graysensor_ResetState(void)
     g_corner_event_count = 0;
     left_black =0;
     last_corner_flag =0;
+    
+    corner_count = 0;
 }
 
 void select_channel(uint8_t channel)
@@ -121,7 +124,7 @@ void Light_Turn_control(void)
 {
     float sum_weight = 0.0f;
     uint8_t sum_black = 0;
-    uint8_t raw_corner;
+    // uint8_t raw_corner = State_Value[0]; 
 
     Graysensor_Read_All();
 
@@ -140,26 +143,36 @@ void Light_Turn_control(void)
     }
 
     Black_Sensor_Count = sum_black;
-    Corner_Rise_Flag = 0;
-
-    left_black = State_Value[0] +State_Value[1] +State_Value[2] +State_Value[3];
-   if(left_black >=3)
-   {
-        Corner_Flag =1;
-   }
-   else 
-   {
-        Corner_Flag =0;
-   }
-
-    if(Corner_Flag ==1&&last_corner_flag==0)
+    
+    
+    if(State_Value[0] == 1)
     {
-        Corner_Rise_Flag =1;
-        
-        g_corner_event_count ++;
+        if(corner_count < 3)
+        {
+            corner_count ++ ;
+        }
+    }
+    else 
+    {
+        corner_count =0;
     }
 
-    last_corner_flag = Corner_Flag; //更新
+    if(corner_count >=2)
+    {
+        Corner_Flag = 1;
+    }
+    else 
+    {
+        Corner_Flag = 0;
+    }
+    Corner_Rise_Flag = 0;
+    
+    if(Corner_Flag == 1 && last_corner_flag == 0)
+    {
+        Corner_Rise_Flag =1;
+    }
+    last_corner_flag = Corner_Flag;
+   
 
     if (sum_black == 0U)
     {

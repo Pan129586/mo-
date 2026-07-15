@@ -32,12 +32,15 @@ float turn_target_yaw=0.0f;
 float min_turn_angle = 45.0f;
 float turn_start_yaw = 0.0f;
 volatile uint8_t flag_20ms = 0;
-
-uint8_t turn_left_speed = 10;
-uint8_t turn_r_speed = 35;
-volatile uint8_t LINE_BASE_SPEED=35;
+//速度变量
+uint8_t turn_left_speed = 15;
+uint8_t turn_r_speed = 40;
+volatile uint8_t LINE_BASE_SPEED=40;
 
 uint8_t normal_line_flag = 0;
+static uint8_t corner_departed = 0;
+uint8_t center_found_count = 0;
+uint8_t corner_lock =0;
 
 
 volatile trace_state_t g_traceState = RUN_STATE_READY;
@@ -80,9 +83,13 @@ void run_data_init(void)
     Start_Flag = 0;
     turn_flag =0;
     turn_target_yaw = total_yaw;
+    corner_departed = 0;
+    center_found_count = 0;
+    corner_lock = 0;
     Graysensor_ResetState();
     set_basespeed(0.0f, 0.0f);
     rest_pid();
+
 }
 
 
@@ -94,6 +101,11 @@ void run_start(void)
     g_lMotor2PulseSigma = 0;
     turn_flag =0;
     turn_target_yaw = total_yaw;
+
+    corner_departed = 0;
+    center_found_count = 0;
+    corner_lock = 0;
+    
     Graysensor_ResetState();
     reset_turn_count();
     rest_pid();
@@ -236,31 +248,78 @@ void Trace_Task20ms(void)
         MotorOutput(0, 0);
         return;
     }
-    // if (turn_flag ==1 )
-    // {
-    //     turn_diff_control();
-    //     return;
-    // }
-    
-    // if(Corner_Rise_Flag ==1)
-    // {
-    //     turn_flag = 1;
-    //      turn_start_yaw = total_yaw;
-    //      center_found_flag = 0;
-    //     normal_line_flag = 0;
-    //      turn_diff_control();
-    //      return;
-    // }
+
 
     g_run_20ms++;
 
-    // direct_val = Gray_pd_control();
-    
-    direct_val = 0;
-    speed_target = Baseleft + direct_val;
-    speed2_target = Baseright - direct_val;
+    if ((turn_flag == 0) &&(Corner_Rise_Flag == 1) &&(corner_lock == 0))
+    {
+        turn_flag = 1;
+        corner_lock = 1;
+        corner_departed = 0;
+         center_found_count = 0;
 
-    
+         PID_reset(&pid_speed);
+        //  PID_reset(&pid_speed2);
+    }
+
+
+   
+    if(turn_flag == 1)
+    {
+        speed_target  = turn_left_speed;   
+        speed2_target = turn_r_speed; 
+        if(State_Value[3] == 0 && State_Value[4] ==0)
+        {
+            corner_departed =1;
+        }
+
+        if(corner_departed ==1)
+        {
+            if(State_Value[3] == 1 ||State_Value[4] ==1)
+            {
+                if(center_found_count <2)
+                {
+                    center_found_count ++ ;
+                }
+            }
+            else 
+            {
+                center_found_count =0;
+            }
+
+            if(center_found_count >=2)
+            {
+                turn_flag =0;
+                corner_departed =0;
+                center_found_count =0;
+
+                g_compt_corner ++;
+
+                if(g_compt_corner >= totall_corners())
+                {
+                    run_stop(RUN_STATE_FINISHED);
+                }
+            }
+            
+        }
+    }
+    else if(turn_flag == 0) 
+    {
+        if((State_Value[0] ==0) && ((State_Value[3]==1)||(State_Value[4]==1)))
+        {
+            corner_lock =0;
+        }
+
+        
+        direct_val = Gray_pd_control();
+        // direct_val = 0;
+
+        speed_target = Baseleft - direct_val;
+        speed2_target = Baseright + direct_val;
+     }
+
+
     set_pid_target(&pid_speed, speed_target);
     set_pid_target(&pid_speed2, speed2_target);
 
@@ -301,12 +360,12 @@ void TIMER_TICK_INST_IRQHandler(void)
             g_trace_isr_count++;
             Trace_Task20ms();
             // Send_To_VOFA(LINE_BASE_SPEED,g_fMotorSpeedCmps,LINE_BASE_SPEED,g_fMotor2SpeedCmps);
-            if ((DL_TimerG_getRawInterruptStatus(
-                     TIMER_TICK_INST, DL_TIMERG_INTERRUPT_ZERO_EVENT) &
-                 DL_TIMERG_INTERRUPT_ZERO_EVENT) != 0U)
-            {
-                g_trace_overrun_count++;
-            }
+            // if ((DL_TimerG_getRawInterruptStatus(
+            //          TIMER_TICK_INST, DL_TIMERG_INTERRUPT_ZERO_EVENT) &
+            //      DL_TIMERG_INTERRUPT_ZERO_EVENT) != 0U)
+            // {
+            //     g_trace_overrun_count++;
+            // }
             break;
         default:
             break;
@@ -325,17 +384,18 @@ float Gray_pd_control(void)
     return direct_pid_realize(&pid_direct, Line_Num);
 }
 
+//实际编码器反应的数值
 float speed_pid_control(void)
 {
     // return speed_pid_realize(&pid_speed, (float)g_nMotorPulse);
-      return speed_pid_realize(&pid_speed, g_fMotorSpeedCmps);   //cm/s的单位
+      return speed_pid_realize(&pid_speed, g_fMotor2SpeedCmps);   //cm/s的单位
  }
 
 float speed2_pid_control(void)
 {
 
     // return speed_pid_realize(&pid_speed2, (float)g_nMotor2Pulse);  //浮点数有影响吗
-     return speed_pid_realize(&pid_speed2, g_fMotor2SpeedCmps);
+     return speed_pid_realize(&pid_speed2, g_fMotorSpeedCmps);
 }
 
 void UART_SendArray(uint8_t *data, uint16_t len)
@@ -360,46 +420,107 @@ void Send_To_VOFA(float target_left, float real_left, float target_right,
 
 
 
-void MotorOutput(int nMotorPwm, int nMotor2Pwm)
-{
+// void MotorOutput(int nMotorPwm, int nMotor2Pwm)
+// {
    
-    if (nMotorPwm > 0) {
-        set_motor_direction(MOTOR_FWD);
-    }
-    else if (nMotorPwm < 0)
-    {
-        nMotorPwm = -nMotorPwm;
-        set_motor_direction(MOTOR_REV);
-    }
-    else
-    {
-        SET_STOP;
-    }
-    if (nMotorPwm > PWM_MAX_PERIOD_COUNT) {
-        nMotorPwm = PWM_MAX_PERIOD_COUNT;
-    }
+//     if (nMotorPwm > 0) 
+//     {
+//         set_motor_direction(MOTOR_FWD);
+//     }
+//     else if (nMotorPwm < 0)
+//     {
+//         nMotorPwm = -nMotorPwm;
+//         set_motor_direction(MOTOR_REV);
+//     }
+//     else
+//     {
+//         SET_STOP;
+//     }
+//     if (nMotorPwm > PWM_MAX_PERIOD_COUNT) {
+//         nMotorPwm = PWM_MAX_PERIOD_COUNT;
+//     }
 
-    if (nMotor2Pwm > 0) {
-        set_motor2_direction(MOTOR_FWD);
-    }
-    else if
-    (nMotor2Pwm < 0)
+//     if (nMotor2Pwm > 0) {
+//         set_motor2_direction(MOTOR_FWD);
+//     }
+//     else if
+//     (nMotor2Pwm < 0)
+//     {
+//         nMotor2Pwm = -nMotor2Pwm;
+//         set_motor2_direction(MOTOR_REV);
+//     }
+//     else
+//     {
+//         SET2_STOP;
+//     }
+//     if
+//     (nMotor2Pwm > PWM2_MAX_PERIOD_COUNT)
+//     {
+//         nMotor2Pwm = PWM2_MAX_PERIOD_COUNT;
+//     }
+    
+//     set_motor_speed((uint16_t)nMotorPwm);
+//     set_motor2_speed((uint16_t)nMotor2Pwm);
+// }
+
+
+void MotorOutput(int left_pwm, int right_pwm)
+{
+    uint16_t left_duty;
+    uint16_t right_duty;
+
+    /*
+     * left_pwm  是逻辑左轮，但实际走 Motor2 通道
+     * right_pwm 是逻辑右轮，但实际走 Motor1 通道
+     */
+
+    if (left_pwm > 0)
     {
-        nMotor2Pwm = -nMotor2Pwm;
+        set_motor2_direction(MOTOR_FWD);
+        left_duty = (uint16_t)left_pwm;
+    }
+    else if (left_pwm < 0)
+    {
         set_motor2_direction(MOTOR_REV);
+        left_duty = (uint16_t)(-left_pwm);
     }
     else
     {
+        left_duty = 0U;
         SET2_STOP;
     }
-    if
-    (nMotor2Pwm > PWM2_MAX_PERIOD_COUNT)
+
+    if (right_pwm > 0)
     {
-        nMotor2Pwm = PWM2_MAX_PERIOD_COUNT;
+        set_motor_direction(MOTOR_FWD);
+        right_duty = (uint16_t)right_pwm;
+    }
+    else if (right_pwm < 0)
+    {
+        set_motor_direction(MOTOR_REV);
+        right_duty = (uint16_t)(-right_pwm);
+    }
+    else
+    {
+        right_duty = 0U;
+        SET_STOP;
     }
 
-    set_motor_speed((uint16_t)nMotorPwm);
-    set_motor2_speed((uint16_t)nMotor2Pwm);
+    if (left_duty > PWM2_MAX_PERIOD_COUNT)
+    {
+        left_duty = PWM2_MAX_PERIOD_COUNT;
+    }
+
+    if (right_duty > PWM_MAX_PERIOD_COUNT)
+    {
+        right_duty = PWM_MAX_PERIOD_COUNT;
+    }
+
+    // 逻辑左轮 -> Motor2/PWMA/BIN
+    set_motor2_speed(left_duty);
+
+    // 逻辑右轮 -> Motor1/PWMB/AIN
+    set_motor_speed(right_duty);
 }
 
 void set_motor_speed(uint16_t v)

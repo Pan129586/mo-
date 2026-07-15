@@ -18,7 +18,7 @@ int main(void)
     reset_turn_count();
     run_data_init();
 
-    NVIC_SetPriority(TIMER_TICK_INST_INT_IRQN, 1U);
+    NVIC_SetPriority(TIMER_TICK_INST_INT_IRQN, 1);
     NVIC_EnableIRQ(TIMER_TICK_INST_INT_IRQN);
     DL_TimerG_startCounter(TIMER_TICK_INST);
 
@@ -29,27 +29,27 @@ int main(void)
     while (1)
     {
         key_press();
-        if ((uint32_t)(ui_time - last_show_time) >= 100)
-        {
-            last_show_time = ui_time;
-            //  Send_To_VOFA(LINE_BASE_SPEED,g_fMotorSpeedCmps,LINE_BASE_SPEED,g_fMotor2SpeedCmps);
-             UART2_SendEncoderData_DMA((int32_t)g_lMotorPulseSigma,(int32_t)g_lMotor2PulseSigma);
-        }
-       
-        // if ((uint32_t)(ui_time - last_show_time) >= 100U)
+        // if ((uint32_t)(ui_time - last_show_time) >= 100)
         // {
         //     last_show_time = ui_time;
-        //     meau_show();
+        //       Send_To_VOFA(LINE_BASE_SPEED,g_fMotorSpeedCmps,LINE_BASE_SPEED,g_fMotor2SpeedCmps);
+            //  UART2_SendEncoderData_DMA((int32_t)g_lMotorPulseSigma,(int32_t)g_lMotor2PulseSigma);
         // }
-
-        if(flag_20ms ==1)
+     
+        if ((uint32_t)(ui_time - last_show_time) >= 100U)
         {
-            // flag_20ms = 0;
+            last_show_time = ui_time;
+            meau_show();
+        }
+
+        // if(flag_20ms ==1)
+        // {
+        //     // flag_20ms = 0;
             
-            //     Trace_Task20ms();
+        //     //     Trace_Task20ms();
             
 
-        }
+        // }
 
     }
 }
