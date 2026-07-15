@@ -28,10 +28,10 @@ void PID_param_init()
     pid_direct.err=0.0;
     pid_direct.err_last=0.0;
     pid_direct.integral=0.0;
-        //2.5
+        
 		pid_direct.Kp = 1.8;
 		pid_direct.Ki = 0.0;
-		pid_direct.Kd = 0.12;
+		pid_direct.Kd = 0.2;
 	
   
     pid_speed.target_val=0.0;				

@@ -1,6 +1,7 @@
 #include "bsp_Graysensor.h"
 
 
+
 volatile uint8_t State_Value[8];
 volatile uint16_t sensor_values[8];
 volatile uint32_t g_gray_scan_count = 0U;
@@ -19,13 +20,15 @@ volatile uint8_t Black_Sensor_Count = 0;
 volatile uint8_t center_found_flag = 0;
 uint8_t corner_count=0;
 
+
 #define ADC_WAIT_TIMEOUT_COUNT 10000U
+
 
 static uint8_t s_corner_latched = 0U;
 
 
 static const float sensor_weight[8] = {
-       -30.0f, -22.0f, -16.0f, -10.0f,10.0f,  16.0f,  22.0f,  30.0f
+       -40.0f, -22.0f, -16.0f, -10.0f,10.0f,  16.0f,  22.0f,  40.0f
 };
 
 void Graysensor_ResetState(void)
@@ -147,7 +150,7 @@ void Light_Turn_control(void)
     
     if(State_Value[0] == 1)
     {
-        if(corner_count < 3)
+        if(corner_count < 2)
         {
             corner_count ++ ;
         }
@@ -157,7 +160,7 @@ void Light_Turn_control(void)
         corner_count =0;
     }
 
-    if(corner_count >=2)
+    if(corner_count >=1)
     {
         Corner_Flag = 1;
     }
@@ -165,6 +168,7 @@ void Light_Turn_control(void)
     {
         Corner_Flag = 0;
     }
+
     Corner_Rise_Flag = 0;
     
     if(Corner_Flag == 1 && last_corner_flag == 0)
@@ -173,7 +177,7 @@ void Light_Turn_control(void)
     }
     last_corner_flag = Corner_Flag;
    
-
+    
     if (sum_black == 0U)
     {
         Line_Num = Last_Num;

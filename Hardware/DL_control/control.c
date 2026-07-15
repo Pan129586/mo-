@@ -7,6 +7,7 @@
 #define FOUR_CORNER_COUNT        (4U)
 // #define LINE_BASE_SPEED          (35.0f)
 #define BASE_turn_angle             (90.0f) 
+#define TURN_PREPARE_TICKS 1
 
  
 float Baseleft = 0.0f;
@@ -41,6 +42,9 @@ uint8_t normal_line_flag = 0;
 static uint8_t corner_departed = 0;
 uint8_t center_found_count = 0;
 uint8_t corner_lock =0;
+static uint8_t turn_prepare = 0;  //直角后直行变量
+static uint8_t turn_prepare_count = 0;
+
 
 
 volatile trace_state_t g_traceState = RUN_STATE_READY;
@@ -83,9 +87,14 @@ void run_data_init(void)
     Start_Flag = 0;
     turn_flag =0;
     turn_target_yaw = total_yaw;
+
     corner_departed = 0;
     center_found_count = 0;
+
+    turn_prepare = 0;
+    turn_prepare_count = 0;
     corner_lock = 0;
+
     Graysensor_ResetState();
     set_basespeed(0.0f, 0.0f);
     rest_pid();
@@ -105,6 +114,9 @@ void run_start(void)
     corner_departed = 0;
     center_found_count = 0;
     corner_lock = 0;
+
+     turn_prepare = 0;
+    turn_prepare_count = 0;
     
     Graysensor_ResetState();
     reset_turn_count();
@@ -252,21 +264,42 @@ void Trace_Task20ms(void)
 
     g_run_20ms++;
 
-    if ((turn_flag == 0) &&(Corner_Rise_Flag == 1) &&(corner_lock == 0))
+    if ((turn_flag == 0)&& (turn_prepare == 0)&&(Corner_Rise_Flag == 1) &&(corner_lock == 0))
     {
-        turn_flag = 1;
+        turn_prepare = 1;
+        turn_prepare_count = 0;
+
         corner_lock = 1;
         corner_departed = 0;
          center_found_count = 0;
 
          PID_reset(&pid_speed);
-        //  PID_reset(&pid_speed2);
+        //   PID_reset(&pid_speed2);
     }
 
-
-   
-    if(turn_flag == 1)
+    if(turn_prepare !=0)
     {
+        speed_target = Baseleft;
+        speed2_target = Baseright;
+
+         turn_prepare_count++;
+          if (turn_prepare_count >= TURN_PREPARE_TICKS)
+          {
+            turn_prepare = 0;
+            turn_prepare_count = 0;
+
+            turn_flag = 1;
+            corner_departed = 0;
+            center_found_count = 0;
+
+             PID_reset(&pid_speed);
+            PID_reset(&pid_speed2);
+
+          }
+    }
+    else if(turn_flag == 1)
+    {
+
         speed_target  = turn_left_speed;   
         speed2_target = turn_r_speed; 
         if(State_Value[3] == 0 && State_Value[4] ==0)
@@ -306,17 +339,17 @@ void Trace_Task20ms(void)
     }
     else if(turn_flag == 0) 
     {
-        if((State_Value[0] ==0) && ((State_Value[3]==1)||(State_Value[4]==1)))
-        {
-            corner_lock =0;
-        }
 
-        
         direct_val = Gray_pd_control();
         // direct_val = 0;
 
         speed_target = Baseleft - direct_val;
         speed2_target = Baseright + direct_val;
+        
+        if((State_Value[0] ==0) && ((State_Value[3]==1)||(State_Value[4]==1)))
+        {
+            corner_lock =0;
+        }
      }
 
 
