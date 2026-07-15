@@ -8,6 +8,9 @@
 // #define LINE_BASE_SPEED          (35.0f)
 #define BASE_turn_angle             (90.0f) 
 #define TURN_PREPARE_TICKS 1
+#define CENTER_LOST_TIME   2
+#define CENTER_FOUND_TIME  2
+
 
  
 float Baseleft = 0.0f;
@@ -35,8 +38,8 @@ float turn_start_yaw = 0.0f;
 volatile uint8_t flag_20ms = 0;
 //速度变量
 uint8_t turn_left_speed = 15;
-uint8_t turn_r_speed = 40;
-volatile uint8_t LINE_BASE_SPEED=40;
+uint8_t turn_r_speed = 60;
+volatile uint8_t LINE_BASE_SPEED=60;
 
 uint8_t normal_line_flag = 0;
 static uint8_t corner_departed = 0;
@@ -44,6 +47,7 @@ uint8_t center_found_count = 0;
 uint8_t corner_lock =0;
 static uint8_t turn_prepare = 0;  //直角后直行变量
 static uint8_t turn_prepare_count = 0;
+ static uint8_t center_lost_count = 0;
 
 
 
@@ -94,6 +98,7 @@ void run_data_init(void)
     turn_prepare = 0;
     turn_prepare_count = 0;
     corner_lock = 0;
+    center_lost_count = 0;
 
     Graysensor_ResetState();
     set_basespeed(0.0f, 0.0f);
@@ -117,6 +122,7 @@ void run_start(void)
 
      turn_prepare = 0;
     turn_prepare_count = 0;
+    center_lost_count = 0;
     
     Graysensor_ResetState();
     reset_turn_count();
@@ -130,6 +136,7 @@ void turn_start()
 {
     turn_flag =1;
     turn_target_yaw =total_yaw + 90.0f;
+    center_lost_count = 0;
 
     PID_reset(&pid_angle);
     PID_reset(&pid_speed);
@@ -272,6 +279,7 @@ void Trace_Task20ms(void)
         corner_lock = 1;
         corner_departed = 0;
          center_found_count = 0;
+          center_lost_count = 0;
 
          PID_reset(&pid_speed);
         //   PID_reset(&pid_speed2);
@@ -291,6 +299,8 @@ void Trace_Task20ms(void)
             turn_flag = 1;
             corner_departed = 0;
             center_found_count = 0;
+            center_lost_count = 0;
+            
 
              PID_reset(&pid_speed);
             PID_reset(&pid_speed2);
@@ -302,16 +312,31 @@ void Trace_Task20ms(void)
 
         speed_target  = turn_left_speed;   
         speed2_target = turn_r_speed; 
+
         if(State_Value[3] == 0 && State_Value[4] ==0)
+        {
+            if(center_lost_count <CENTER_LOST_TIME)   //连续两个周期中间两个探头都灭掉才是离开直线
+            {
+                center_lost_count ++;
+            }
+            
+        }
+         else 
+        {
+            center_lost_count =0;
+        }
+
+         if(center_lost_count >=CENTER_LOST_TIME)
         {
             corner_departed =1;
         }
+
 
         if(corner_departed ==1)
         {
             if(State_Value[3] == 1 ||State_Value[4] ==1)
             {
-                if(center_found_count <2)
+                if(center_found_count <CENTER_FOUND_TIME )
                 {
                     center_found_count ++ ;
                 }
@@ -321,12 +346,17 @@ void Trace_Task20ms(void)
                 center_found_count =0;
             }
 
-            if(center_found_count >=2)
+            if ( (center_found_count >= CENTER_FOUND_TIME) &&(Black_Sensor_Count >= 1))
             {
                 turn_flag =0;
+                turn_prepare = 0;
+                turn_prepare_count = 0;
+
                 corner_departed =0;
                 center_found_count =0;
-
+                 center_lost_count = 0;
+                corner_lock = 0;
+                // PID_reset(&pid_direct);
                 g_compt_corner ++;
 
                 if(g_compt_corner >= totall_corners())
@@ -340,18 +370,30 @@ void Trace_Task20ms(void)
     else if(turn_flag == 0) 
     {
 
-        direct_val = Gray_pd_control();
-        // direct_val = 0;
+        // direct_val = Gray_pd_control();
+        // // direct_val = 0;
 
-        speed_target = Baseleft - direct_val;
-        speed2_target = Baseright + direct_val;
+        // speed_target = Baseleft - direct_val;
+        // speed2_target = Baseright + direct_val;
+        if (Black_Sensor_Count >= 1)
+        {
+            direct_val = Gray_pd_control();
+
+            speed_target = Baseleft - direct_val;
+            speed2_target = Baseright + direct_val;
+        }
+        else
+        {
+            // 暂时保持直行速度，不让旧误差立即把车拉反
+            speed_target = Baseleft;
+            speed2_target = Baseright;
+        }
         
         if((State_Value[0] ==0) && ((State_Value[3]==1)||(State_Value[4]==1)))
         {
             corner_lock =0;
         }
      }
-
 
     set_pid_target(&pid_speed, speed_target);
     set_pid_target(&pid_speed2, speed2_target);

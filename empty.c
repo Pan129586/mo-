@@ -7,7 +7,7 @@
 #include "Hardware/Graysensor/bsp_Graysensor.h"
 #include "Hardware/uart/uart.h"
 
-uint32_t last_show_time = 0U;
+uint32_t last_show_time = 0;
 
 int main(void)
 {
